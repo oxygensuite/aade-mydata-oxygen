@@ -1,0 +1,8 @@
+parameters:
+    level: max
+    paths:
+        - src
+
+    # Only the shipped code is analysed. The tests read the package's nullable model getters
+    # directly (`$doc->first()->getErrors()->first()`) and index into decoded payloads, which
+    # at this level would have to be reshaped test by test; the suite covers them instead.

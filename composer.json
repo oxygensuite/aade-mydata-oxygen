@@ -1,0 +1,60 @@
+{
+    "name": "oxygensuite/aade-mydata-oxygen",
+    "description": "Routes firebed/aade-mydata SendInvoices and CancelInvoice through the Oxygen e-invoicing provider (mydataprovider v2 API).",
+    "type": "library",
+    "keywords": ["myDATA", "AADE", "ΑΑΔΕ", "provider", "e-invoicing", "oxygen"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ilias Sarantoglou",
+            "email": "isarantoglou@oxygen.gr",
+            "role": "Developer"
+        },
+        {
+            "name": "Okan Giritli",
+            "email": "ogiritli@oxygen.gr",
+            "role": "Developer"
+        },
+        {
+            "name": "Oxygen Pelatologio",
+            "homepage": "https://www.oxygen.gr",
+            "role": "Maintainer"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "composer-runtime-api": "^2.0",
+        "ext-dom": "*",
+        "ext-json": "*",
+        "firebed/aade-mydata": "dev-feature/gateway",
+        "guzzlehttp/guzzle": "^7.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.20",
+        "phpstan/phpstan": "^2.2",
+        "phpunit/phpunit": "^11.5"
+    },
+    "autoload": {
+        "psr-4": {"OxygenSuite\\AadeMyData\\": "src/"}
+    },
+    "autoload-dev": {
+        "psr-4": {"Tests\\": "tests/"}
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/firebed/aade-mydata.git"
+        }
+    ],
+    "scripts": {
+        "test": "phpunit",
+        "lint": "pint src tests",
+        "lint:test": "pint --test src tests",
+        "stan": "phpstan analyse --memory-limit=1G",
+        "check": ["@lint:test", "@stan", "@test"]
+    },
+    "config": {"optimize-autoloader": true, "preferred-install": "dist", "sort-packages": true,
+        "platform": {"php": "8.2.0"}},
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
