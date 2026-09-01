@@ -38,8 +38,10 @@ final class SignatureException extends RuntimeException
      * A success the bridge cannot read: not JSON, or a record missing the fields a signature
      * is made of. Worded like the gateway's 9002 so support recognises it.
      */
-    public static function unreadable(ProviderResponse $response): self
+    public static function unreadable(ProviderResponse $response, ?string $hint = null): self
     {
-        return new self('The provider returned an unreadable response: '.$response->excerpt(), $response->status, []);
+        $message = 'The provider returned an unreadable response: '.$response->excerpt();
+
+        return new self($hint === null ? $message : $message.' '.$hint, $response->status, []);
     }
 }

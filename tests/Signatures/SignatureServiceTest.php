@@ -131,6 +131,37 @@ class SignatureServiceTest extends TestCase
         }
     }
 
+    /**
+     * The POST already minted the signature, so the caller must be told to look it up rather
+     * than create a second one — POST /signatures has no idempotency.
+     */
+    public function test_an_unreadable_create_points_at_the_recovery_path(): void
+    {
+        $signatures = $this->service([new Response(201, [], '{"id":"01SIG"}')]);
+        $invoice = Invoices::pos();
+
+        try {
+            $signatures->create($invoice, $invoice->getPaymentMethods()->first(), NSP::VIVA, SignatureDuration::HOURS_2);
+            $this->fail('expected a SignatureException');
+        } catch (SignatureException $e) {
+            $this->assertStringContainsString('pending()', $e->getMessage());
+        }
+    }
+
+    /**
+     * signature_hex is the printable form, not what an invoice references: a record without it
+     * is still usable, so it must not cost the ERP a signature it has already been billed for.
+     */
+    public function test_a_record_without_the_printable_hex_is_still_a_signature(): void
+    {
+        $withoutHex = str_replace('"signature_hex":"3045",', '', self::RECORD);
+        $signatures = $this->service([new Response(200, [], $withoutHex)]);
+
+        $signature = $signatures->find('01SIG');
+
+        $this->assertSame('MEUCIQ==', $signature->signature);
+        $this->assertNull($signature->signatureHex);
+    }
     public function test_the_token_being_rejected_is_the_package_authentication_exception(): void
     {
         $signatures = $this->service([new Response(401, [], '{"message":"Unauthenticated."}')]);

@@ -26,7 +26,7 @@ final class Signature
         /** The provider's signed_text: what an invoice references. */
         public readonly string $signature,
         /** The same bytes in upper-case hex, for printing on the document. */
-        public readonly string $signatureHex,
+        public readonly ?string $signatureHex,
         public readonly string $terminalId,
         public readonly NSP $nsp,
         public readonly SignatureDuration $duration,
@@ -56,7 +56,9 @@ final class Signature
         $nsp = is_array($row['nsp'] ?? null) ? ($row['nsp']['value'] ?? null) : null;
         $duration = $row['duration'] ?? null;
 
-        if (! is_string($id) || ! is_string($uid) || ! is_string($signature) || ! is_string($hex)
+        // Only what a signature cannot exist without is required: a record that is missing
+        // the printable hex is still a signature an invoice can reference.
+        if (! is_string($id) || ! is_string($uid) || ! is_string($signature)
             || ! is_string($terminalId) || ! is_numeric($amount) || ! is_bool($expired)
             || ! is_int($nsp) || ! is_int($duration)) {
             return null;
@@ -78,7 +80,7 @@ final class Signature
             uid: $uid,
             mark: is_scalar($mark) ? (string) $mark : null,
             signature: $signature,
-            signatureHex: $hex,
+            signatureHex: is_string($hex) ? $hex : null,
             terminalId: $terminalId,
             nsp: $nspCase,
             duration: $durationCase,

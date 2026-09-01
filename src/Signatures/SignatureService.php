@@ -42,8 +42,10 @@ final class SignatureService
     public function create(Invoice $invoice, PaymentMethodDetail $payment, NSP $nsp, SignatureDuration $duration): Signature
     {
         $payload = $this->mapper->map($invoice, $payment, $nsp, $duration);
+        $response = $this->send(fn (): ProviderResponse => $this->client->storeSignature($payload));
 
-        return $this->one($this->send(fn (): ProviderResponse => $this->client->storeSignature($payload)));
+        // A success we cannot read still minted a signature, and the ERP has no id for it.
+        return $this->one($response, 'The signature was created but could not be read: find it with pending() instead of creating another.');
     }
 
     /**
@@ -117,7 +119,7 @@ final class SignatureService
     /**
      * @throws SignatureException
      */
-    private function one(ProviderResponse $response): Signature
+    private function one(ProviderResponse $response, ?string $unreadableHint = null): Signature
     {
         if (! $response->isSuccessful()) {
             throw SignatureException::rejected($response);
@@ -125,6 +127,6 @@ final class SignatureService
 
         $body = $response->body;
 
-        return ($body === null ? null : Signature::tryFrom($body)) ?? throw SignatureException::unreadable($response);
+        return ($body === null ? null : Signature::tryFrom($body)) ?? throw SignatureException::unreadable($response, $unreadableHint);
     }
 }
