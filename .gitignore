@@ -4,3 +4,4 @@
 /docs
 .phpunit.result.cache
 /kernel.php
+/.env
