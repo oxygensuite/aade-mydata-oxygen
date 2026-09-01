@@ -14,6 +14,7 @@ use Firebed\AadeMyData\Models\InvoiceHeader;
 use Firebed\AadeMyData\Models\OtherDeliveryNoteHeader;
 use Firebed\AadeMyData\Models\Party;
 use Firebed\AadeMyData\Models\TransportDetail;
+use OxygenSuite\AadeMyData\Exceptions\IssueTimeMissingException;
 use OxygenSuite\AadeMyData\Mapping\HeaderMapper;
 use OxygenSuite\AadeMyData\Mapping\PartyMapper;
 use Tests\TestCase;
@@ -47,39 +48,46 @@ class HeaderMapperTest extends TestCase
         ], $this->mapper()->header($header));
     }
 
-    public function test_past_date_without_issue_time_is_athens_midnight_and_a_missing_series_is_omitted(): void
+    /**
+     * The bridge used to time an untimed document itself — the current time for today, Athens
+     * midnight for any other date — so the invoice carried, and a POS signature attested, a
+     * time the ERP never issued. It is refused instead.
+     */
+    public function test_a_date_without_an_issue_time_is_refused(): void
     {
-        $header = (new InvoiceHeader())->setAa('1')->setIssueDate('2026-08-20')->setInvoiceType('1.1');
+        foreach (['2026-08-20', $this->nowInAthens()->format('Y-m-d')] as $issueDate) {
+            $header = (new InvoiceHeader())->setSeries('A')->setAa('1')->setIssueDate($issueDate)->setInvoiceType('1.1');
 
-        $payload = $this->mapper()->header($header);
-
-        $this->assertSame('2026-08-20T00:00:00+03:00', $payload['issued_at']);
-        // The provider defaults a missing series to '0' itself.
-        $this->assertArrayNotHasKey('series', $payload);
+            try {
+                $this->mapper()->header($header);
+                $this->fail("expected $issueDate to be refused without an issue time");
+            } catch (IssueTimeMissingException $e) {
+                $this->assertSame('A-1', $e->document);
+                $this->assertStringContainsString('setIssueTime', $e->getMessage());
+            }
+        }
     }
 
-    public function test_todays_date_without_issue_time_is_stamped_now(): void
-    {
-        $now = $this->nowInAthens();
-        $header = (new InvoiceHeader())->setAa('1')->setIssueDate($now->format('Y-m-d'));
-
-        $issuedAt = new DateTimeImmutable($this->mapper()->header($header)['issued_at']);
-
-        $this->assertEqualsWithDelta($now->getTimestamp(), $issuedAt->getTimestamp(), 5);
-        $this->assertSame($now->format('P'), $issuedAt->format('P'));
-    }
-
-    public function test_a_stamped_issue_time_is_capped_at_an_earlier_dispatch_today(): void
+    /**
+     * A dispatch time is not an issue time: it used to cap the invented instant, which is
+     * exactly the kind of near-enough value this refuses to send.
+     */
+    public function test_a_dispatch_time_does_not_stand_in_for_the_issue_time(): void
     {
         $today = $this->nowInAthens()->format('Y-m-d');
         $header = (new InvoiceHeader())->setAa('7')->setIssueDate($today)->setDispatchDate($today)->setDispatchTime('00:00:00');
 
-        $payload = $this->mapper()->header($header);
-
-        $this->assertSame($payload['dispatched_at'], $payload['issued_at']);
-        $this->assertStringStartsWith("{$today}T00:00:00", $payload['issued_at']);
+        $this->expectException(IssueTimeMissingException::class);
+        $this->mapper()->header($header);
     }
 
+    public function test_a_missing_series_is_omitted_for_the_provider_to_default(): void
+    {
+        $payload = $this->mapper()->header((new InvoiceHeader())->setAa('1')->setIssueDate('2026-08-20')->setIssueTime('10:15:00')->setInvoiceType('1.1'));
+
+        $this->assertSame('2026-08-20T10:15:00+03:00', $payload['issued_at']);
+        $this->assertArrayNotHasKey('series', $payload);
+    }
     public function test_erp_issue_time_is_not_capped_by_the_dispatch_time(): void
     {
         $header = (new InvoiceHeader())->setAa('7')->setIssueDate('2026-08-27')->setIssueTime('10:15:00')->setDispatchDate('2026-08-27')->setDispatchTime('09:00:00');
@@ -107,13 +115,13 @@ class HeaderMapperTest extends TestCase
 
     public function test_delivery_note_dispatch_time_is_kept(): void
     {
-        $header = (new InvoiceHeader())->setAa('7')->setIssueDate('2026-08-27')->setInvoiceType('9.3')
+        $header = (new InvoiceHeader())->setAa('7')->setIssueDate('2026-08-27')->setIssueTime('08:45:00')->setInvoiceType('9.3')
             ->setDispatchDate('2026-08-27')->setDispatchTime('09:00:00')->setVehicleNumber('ABC1234')->setIsDeliveryNote(true)
             ->setTotalCancelDeliveryOrders(true)->setTableAA('T1')->setOtherMovePurposeTitle('x');
 
         $payload = $this->mapper()->header($header);
 
-        $this->assertSame('2026-08-27T00:00:00+03:00', $payload['issued_at']);
+        $this->assertSame('2026-08-27T08:45:00+03:00', $payload['issued_at']);
         $this->assertSame('2026-08-27T09:00:00+03:00', $payload['dispatched_at']);
         $this->assertSame('ABC1234', $payload['vehicle_number']);
         $this->assertTrue($payload['is_delivery_note']);

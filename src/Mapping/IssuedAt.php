@@ -7,49 +7,42 @@ use DateTimeInterface;
 use DateTimeZone;
 use Exception;
 use Firebed\AadeMyData\Models\InvoiceHeader;
+use OxygenSuite\AadeMyData\Exceptions\IssueTimeMissingException;
 
 /**
  * The Athens instant a document was issued at.
  *
- * myDATA carries only a date; both the invoice payload and a POS signature need a full
- * instant, and the two must agree — a signature's uid is generated from the same issue
- * instant as the invoice's, and nothing on the provider validates the pair, so a drift
- * would be silent. One implementation, used by HeaderMapper and SignatureMapper alike.
+ * myDATA carries only a date, while both the invoice payload and a POS signature need a full
+ * instant — and the two must be the same one, since a signature's uid is generated from it
+ * and nothing on the provider validates the pair. One implementation, one value: the time
+ * the ERP stated through InvoiceHeader::setIssueTime().
  */
 final class IssuedAt
 {
     public const TIMEZONE = 'Europe/Athens';
 
     /**
-     * The ERP supplies the time through InvoiceHeader::setIssueTime() (kept off the myDATA
-     * XML). Without it, today's documents are stamped with the current Athens time — capped
-     * at an earlier dispatch time today, since the provider requires dispatched_at >=
-     * issued_at — and any other date is sent as Athens midnight, which the provider accepts
-     * only with transmissionFailure = 1.
+     * @throws IssueTimeMissingException when the header states a date but no time
      */
     public static function of(InvoiceHeader $header): ?DateTimeImmutable
     {
         $issueTime = $header->getIssueTime() ?: null;
         $issuedAt = self::athens($header->getIssueDate() ?: null, $issueTime);
 
-        if ($issueTime !== null || $issuedAt === null) {
-            return $issuedAt;
+        // A date on its own would have to be timed by the bridge, which is how a document
+        // ends up transmitted — and signed — with a time it never carried.
+        if ($issuedAt !== null && $issueTime === null) {
+            throw new IssueTimeMissingException(self::document($header));
         }
 
-        $now = new DateTimeImmutable('now', new DateTimeZone(self::TIMEZONE));
-
-        if ($issuedAt->format('Y-m-d') !== $now->format('Y-m-d')) {
-            return $issuedAt;
-        }
-
-        $dispatchedAt = self::dispatchedAt($header);
-
-        return $dispatchedAt !== null && $dispatchedAt < $now && $dispatchedAt->format('Y-m-d') === $now->format('Y-m-d') ? $dispatchedAt : $now;
+        return $issuedAt;
     }
 
     /**
      * The instant in the provider's format, or the raw myDATA date when it cannot be parsed
      * so the provider's date_format error names the value instead of the bridge faulting.
+     *
+     * @throws IssueTimeMissingException
      */
     public static function atom(InvoiceHeader $header): ?string
     {
@@ -58,7 +51,7 @@ final class IssuedAt
 
     /**
      * myDATA's dispatchTime is optional; the provider wants a full instant, so a missing
-     * time borrows the issue time.
+     * time borrows the issue time the ERP stated.
      */
     public static function dispatch(InvoiceHeader $header, ?DateTimeImmutable $issuedAt): ?DateTimeImmutable
     {
@@ -84,14 +77,12 @@ final class IssuedAt
     }
 
     /**
-     * The dispatch instant as the ERP stated it, used only to cap an unstated issue time.
-     * A missing dispatchTime must not borrow the issue time here, or the cap would compare
-     * the issue time with itself.
+     * Series and number name the offending document in a batch, when the ERP set them.
      */
-    private static function dispatchedAt(InvoiceHeader $header): ?DateTimeImmutable
+    private static function document(InvoiceHeader $header): ?string
     {
-        $dispatchTime = $header->getDispatchTime() ?: null;
+        $parts = array_filter([$header->getSeries(), $header->getAa()], fn (?string $part): bool => $part !== null && $part !== '');
 
-        return $dispatchTime === null ? null : self::athens($header->getDispatchDate() ?: null, $dispatchTime);
+        return $parts === [] ? null : implode('-', $parts);
     }
 }

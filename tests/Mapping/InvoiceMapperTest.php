@@ -25,7 +25,7 @@ class InvoiceMapperTest extends TestCase
                 'vat_number' => '987654321', 'country_code' => 'GR', 'branch_code' => 0, 'name' => 'Customer',
                 'address' => ['street' => 'Ermou', 'number' => '1', 'postal_code' => '10563', 'city' => 'Athens'],
             ],
-            'header' => ['series' => 'A', 'number' => '42', 'issued_at' => '2026-08-27T00:00:00+03:00', 'invoice_type' => '1.1', 'currency' => 'EUR'],
+            'header' => ['series' => 'A', 'number' => '42', 'issued_at' => '2026-08-27T09:30:00+03:00', 'invoice_type' => '1.1', 'currency' => 'EUR'],
             'payment_methods' => [['type' => 3, 'amount' => 124.0]],
             'lines' => [[
                 'description' => 'Consulting', 'quantity' => 2.0, 'measurement_unit' => 1, 'unit_price' => 50.0,

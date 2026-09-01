@@ -88,7 +88,7 @@ payment is stored and its myDATA transmission is queued; `422` → `ValidationEr
 
 Bridge-specific codes: `9001` — a referenced mark is unknown to the provider (e.g. an
 invoice transmitted through the ERP channel before you switched); `9002` — the provider
-returned an unreadable response.
+returned an unreadable response; `9003` — the invoice states an issue date but no issue time.
 
 A batch never stops midway: a failing invoice becomes a `TechnicalError` entry and the
 remaining invoices are still sent. Re-sending an invoice the provider already holds
@@ -102,21 +102,26 @@ The provider can only cancel **9.3 delivery notes** (`PATCH /invoices/{id}/cance
 carrying the provider's message — issue a credit note instead. `entityVatNumber` is ignored;
 the token identifies the company.
 
-## Issue time, `issueDate` and `transmissionFailure`
+## Issue time (required), `issueDate` and `transmissionFailure`
 
-myDATA carries only an issue **date**; the provider requires an issue **datetime**. Give it
-the time your ERP printed on the document:
+myDATA carries only an issue **date**; the provider records an issue **datetime**, and a POS
+signature attests one. That time is yours to state — **`setIssueTime()` is required** for
+every invoice that goes through the provider:
 
 ```php
 $invoice->getInvoiceHeader()->setIssueDate('2026-08-28')->setIssueTime('10:15:00');
 ```
 
 `setIssueTime()` (aade-mydata ≥ 5.11) stays on the model — `toArray()`, `make()` — but is
-never written to the myDATA XML, so nothing changes for the ERP channel. Without it the
-bridge stamps today's invoices with the current Athens time (capped at an earlier dispatch
-time, since the provider requires `dispatched_at >= issued_at`) and sends any other date as
-Athens midnight. A delivery note's `dispatchTime` is kept; when it is missing, the issue
-time is used.
+never written to the myDATA XML, so nothing changes for the ERP channel.
+
+An invoice with a date but no time comes back as a `ValidationError` with code **`9003`**,
+naming the document, and is not transmitted; the rest of the batch still is. The bridge used
+to fill the gap itself — the current time for today, Athens midnight for any other date —
+which meant transmitting, and signing, a time the document never carried.
+
+A delivery note's `dispatchTime` is kept; when it is missing, it borrows the issue time you
+stated.
 
 The provider rejects any date other than the current Athens day unless
 `transmissionFailure` is `TransmissionFailure::ERP_CONNECTION_FAILURE` (value 1: you could
@@ -183,15 +188,11 @@ signing time.
 Everything else in the request is read off the models you already built: the issuer, the
 header, the invoice totals, the payment's amount and its `tid`.
 
-**Set `setIssueTime()` on a POS invoice.** The signature attests an issue instant and its uid
-is generated from it, so `create()` and the later `handle()` must agree on one. Without an
-issue time each call stamps the current Athens time, so the two differ — and across midnight
-the invoice is rejected outright. If your ERP really has no issue time, pin the one the
-signature used:
-
-```php
-$invoice->getInvoiceHeader()->setIssueTime($signature->invoiceIssuedAt->format('H:i:s'));
-```
+The signature attests an issue instant and its uid is generated from it, so `create()` and
+the later `handle()` must agree on one. That is why the issue time is required rather than
+filled in: `create()` throws `IssueTimeMissingException` for an invoice that has none, the
+same refusal `SendInvoices` reports as `9003`. The returned signature exposes the instant it
+attests as `$signature->invoiceIssuedAt`, so you can check it against the document you printed.
 
 ### Paying an invoice that was already transmitted
 

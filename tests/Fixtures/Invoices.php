@@ -29,7 +29,7 @@ final class Invoices
         $invoice->setIssuer((new Issuer())->setVatNumber('123456789')->setCountry('GR')->setBranch(0));
         $invoice->setCounterpart((new Counterpart())->setVatNumber('987654321')->setCountry('GR')->setBranch(0)->setName('Customer')
             ->setAddress((new Address())->setStreet('Ermou')->setNumber('1')->setPostalCode('10563')->setCity('Athens')));
-        $invoice->setInvoiceHeader((new InvoiceHeader())->setSeries('A')->setAa($aa)->setIssueDate($issueDate)->setInvoiceType(InvoiceType::TYPE_1_1)->setCurrency('EUR'));
+        $invoice->setInvoiceHeader((new InvoiceHeader())->setSeries('A')->setAa($aa)->setIssueDate($issueDate)->setIssueTime('09:30:00')->setInvoiceType(InvoiceType::TYPE_1_1)->setCurrency('EUR'));
         $invoice->addPaymentMethod((new PaymentMethodDetail())->setType(PaymentMethod::METHOD_3)->setAmount(124.0));
         $invoice->addInvoiceDetails((new InvoiceDetails())->setLineNumber(1)->setItemDescr('Consulting')->setQuantity(2)->setMeasurementUnit(UnitMeasurement::UNIT_1)->setUnitPrice(50.0)
             ->setNetValue(100.0)->setVatCategory(VatCategory::VAT_1)->setVatAmount(24.0)
@@ -44,7 +44,7 @@ final class Invoices
     {
         $invoice = new Invoice();
         $invoice->setIssuer((new Issuer())->setVatNumber('123456789')->setCountry('GR')->setBranch(1));
-        $invoice->setInvoiceHeader((new InvoiceHeader())->setSeries('R')->setAa('9')->setIssueDate('2026-08-27')->setInvoiceType(InvoiceType::TYPE_11_1)->setCurrency('EUR'));
+        $invoice->setInvoiceHeader((new InvoiceHeader())->setSeries('R')->setAa('9')->setIssueDate('2026-08-27')->setIssueTime('12:00:00')->setInvoiceType(InvoiceType::TYPE_11_1)->setCurrency('EUR'));
         $invoice->addPaymentMethod((new PaymentMethodDetail())->setType(PaymentMethod::METHOD_3)->setAmount(12.4));
         $invoice->addInvoiceDetails((new InvoiceDetails())->setLineNumber(1)->setItemDescr('Coffee')->setQuantity(1)->setUnitPrice(10.0)->setNetValue(10.0)->setVatCategory(VatCategory::VAT_1)->setVatAmount(2.4)
             ->addIncomeClassification(IncomeClassificationType::E3_561_003, IncomeClassificationCategory::CATEGORY_1_1, 10.0));
@@ -93,7 +93,7 @@ final class Invoices
         $invoice->setIssuer((new Issuer())->setVatNumber('123456789')->setCountry('GR')->setBranch(0));
         $invoice->setCounterpart((new Counterpart())->setVatNumber('987654321')->setCountry('GR')->setBranch(0)->setName('Customer')
             ->setAddress((new Address())->setStreet('Ermou')->setNumber('1')->setPostalCode('10563')->setCity('Athens')));
-        $header = (new InvoiceHeader())->setSeries('D')->setAa('3')->setIssueDate('2026-08-27')->setInvoiceType(InvoiceType::TYPE_9_3)
+        $header = (new InvoiceHeader())->setSeries('D')->setAa('3')->setIssueDate('2026-08-27')->setIssueTime('08:45:00')->setInvoiceType(InvoiceType::TYPE_9_3)
             ->setDispatchDate('2026-08-27')->setDispatchTime('09:00:00')->setMovePurpose(MovePurpose::TYPE_1)->setVehicleNumber('ABC1234')
             ->setOtherDeliveryNoteHeader((new OtherDeliveryNoteHeader())->setStartShippingBranch(0)->setCompleteShippingBranch(0)
                 ->setLoadingAddress((new Address())->setStreet('Depot')->setNumber('5')->setPostalCode('11111')->setCity('Piraeus'))

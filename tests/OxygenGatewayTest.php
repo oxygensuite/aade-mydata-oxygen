@@ -50,7 +50,7 @@ class OxygenGatewayTest extends TestCase
         $this->assertSame('Bearer test-token', $this->history[0]['request']->getHeaderLine('Authorization'));
         $json = $this->requestJson(0);
         $this->assertSame('1', $json['header']['number']);
-        $this->assertSame('2026-08-27T00:00:00+03:00', $json['header']['issued_at']);
+        $this->assertSame('2026-08-27T09:30:00+03:00', $json['header']['issued_at']);
         $this->assertSame('123456789', $json['issuer']['vat_number']);
         $this->assertSame('2', $this->requestJson(1)['header']['number']);
 
@@ -227,6 +227,29 @@ class OxygenGatewayTest extends TestCase
         $this->assertSame('2026-08-27T10:15:00+03:00', $this->requestJson(0)['header']['issued_at']);
     }
 
+    /**
+     * The bridge will not time a document the ERP left untimed, and says so per invoice: the
+     * rest of the batch is still transmitted.
+     */
+    public function test_an_invoice_without_an_issue_time_is_rejected_without_being_sent(): void
+    {
+        $this->registerGateway([new Response(201, [], '{"uid":"U2","mark":400002,"url":"u"}')]);
+        $untimed = Invoices::b2b(aa: '1');
+        $untimed->getInvoiceHeader()->setIssueTime(null);
+
+        $doc = (new SendInvoices())->handle([$untimed, Invoices::b2b(aa: '2')]);
+
+        $this->assertSame('ValidationError', $doc[0]->getStatusCode());
+        $this->assertSame('9003', $doc[0]->getErrors()->first()->getCode());
+        $this->assertStringContainsString('A-1', $doc[0]->getErrors()->first()->getMessage());
+        $this->assertStringContainsString('setIssueTime', $doc[0]->getErrors()->first()->getMessage());
+
+        $this->assertTrue($doc[1]->isSuccessful());
+        $this->assertSame('400002', $doc[1]->getInvoiceMark());
+        // Only the timed invoice reached the provider.
+        $this->assertCount(1, $this->history);
+        $this->assertSame('2', $this->requestJson(0)['header']['number']);
+    }
     public function test_a_pos_signature_reaches_the_provider_on_the_invoice(): void
     {
         $this->registerGateway([new Response(201, [], '{"uid":"U","mark":400001,"url":"u"}')]);

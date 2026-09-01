@@ -22,6 +22,7 @@ use OxygenSuite\AadeMyData\Api\ProviderClient;
 use OxygenSuite\AadeMyData\Api\ProviderException;
 use OxygenSuite\AadeMyData\Api\ProviderResponse;
 use OxygenSuite\AadeMyData\Api\UnauthorizedException;
+use OxygenSuite\AadeMyData\Exceptions\IssueTimeMissingException;
 use OxygenSuite\AadeMyData\Exceptions\MarkNotFoundException;
 use OxygenSuite\AadeMyData\Mapping\CompanyResolver;
 use OxygenSuite\AadeMyData\Mapping\DocumentResolver;
@@ -141,6 +142,8 @@ final class OxygenGateway implements Gateway
                 : $this->recoverDuplicate($duplicateUid, $response);
         } catch (MarkNotFoundException $e) {
             return $this->responses->forMarkNotFound($e);
+        } catch (IssueTimeMissingException $e) {
+            return $this->responses->forMissingIssueTime($e);
         } catch (ProviderException $e) {
             return $this->responses->forTransportFailure($e);
         }

@@ -7,6 +7,7 @@ use Firebed\AadeMyData\Models\InvoiceHeader;
 use Firebed\AadeMyData\Models\PaymentMethodDetail;
 use OxygenSuite\AadeMyData\Enums\NSP;
 use OxygenSuite\AadeMyData\Enums\SignatureDuration;
+use OxygenSuite\AadeMyData\Exceptions\IssueTimeMissingException;
 
 /**
  * Turns an invoice and one of its POS payments into the JSON payload of the provider's
@@ -17,6 +18,7 @@ use OxygenSuite\AadeMyData\Enums\SignatureDuration;
 final class SignatureMapper
 {
     /**
+     * @throws IssueTimeMissingException when the invoice states an issue date but no time
      * @return array<array-key, mixed>
      */
     public function map(Invoice $invoice, PaymentMethodDetail $payment, NSP $nsp, SignatureDuration $duration): array

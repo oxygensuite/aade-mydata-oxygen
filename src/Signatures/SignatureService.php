@@ -11,6 +11,7 @@ use OxygenSuite\AadeMyData\Api\ProviderResponse;
 use OxygenSuite\AadeMyData\Api\UnauthorizedException;
 use OxygenSuite\AadeMyData\Enums\NSP;
 use OxygenSuite\AadeMyData\Enums\SignatureDuration;
+use OxygenSuite\AadeMyData\Exceptions\IssueTimeMissingException;
 use OxygenSuite\AadeMyData\Mapping\SignatureMapper;
 
 /**
@@ -37,7 +38,7 @@ final class SignatureService
      * Never retry this call blindly: a lost answer may already have created the signature
      * (see pending()).
      *
-     * @throws SignatureException|ProviderException|MyDataAuthenticationException
+     * @throws SignatureException|ProviderException|MyDataAuthenticationException|IssueTimeMissingException
      */
     public function create(Invoice $invoice, PaymentMethodDetail $payment, NSP $nsp, SignatureDuration $duration): Signature
     {

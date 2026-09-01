@@ -8,6 +8,7 @@ use Firebed\AadeMyData\Models\Response;
 use OxygenSuite\AadeMyData\Api\ProviderException;
 use OxygenSuite\AadeMyData\Api\ProviderResponse;
 use OxygenSuite\AadeMyData\Api\UnauthorizedException;
+use OxygenSuite\AadeMyData\Exceptions\IssueTimeMissingException;
 use OxygenSuite\AadeMyData\Exceptions\MarkNotFoundException;
 
 /**
@@ -20,6 +21,9 @@ final class ProviderResponseMapper
 
     /** Bridge-originated: the provider answered 2xx with a body that is not JSON. */
     public const CODE_UNREADABLE_RESPONSE = '9002';
+
+    /** Bridge-originated: the ERP stated an issue date but no issue time. */
+    public const CODE_ISSUE_TIME_MISSING = '9003';
 
     private const SUCCESS = 'Success';
     private const VALIDATION_ERROR = 'ValidationError';
@@ -102,6 +106,15 @@ final class ProviderResponseMapper
     public function forUnauthorized(UnauthorizedException $exception): Response
     {
         return $this->error(self::TECHNICAL_ERROR, [[401, $exception->getMessage()]]);
+    }
+
+    /**
+     * Refused before anything was transmitted: the bridge will not time a document the ERP
+     * left untimed.
+     */
+    public function forMissingIssueTime(IssueTimeMissingException $exception): Response
+    {
+        return $this->error(self::VALIDATION_ERROR, [[self::CODE_ISSUE_TIME_MISSING, $exception->getMessage()]]);
     }
 
     public function forMissingMark(string $message): Response

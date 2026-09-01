@@ -8,6 +8,7 @@ use Firebed\AadeMyData\Models\InvoiceHeader;
 use Firebed\AadeMyData\Models\PaymentMethodDetail;
 use OxygenSuite\AadeMyData\Api\ProviderException;
 use OxygenSuite\AadeMyData\Api\UnauthorizedException;
+use OxygenSuite\AadeMyData\Exceptions\IssueTimeMissingException;
 use OxygenSuite\AadeMyData\Exceptions\MarkNotFoundException;
 
 /**
@@ -33,7 +34,7 @@ final class InvoiceMapper
     }
 
     /**
-     * @throws MarkNotFoundException|ProviderException|UnauthorizedException
+     * @throws MarkNotFoundException|IssueTimeMissingException|ProviderException|UnauthorizedException
      * @return array<array-key, mixed>
      */
     public function map(Invoice $invoice): array

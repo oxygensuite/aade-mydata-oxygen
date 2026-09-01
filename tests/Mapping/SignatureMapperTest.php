@@ -2,12 +2,12 @@
 
 namespace Tests\Mapping;
 
-use Firebed\AadeMyData\Enums\InvoiceType;
 use Firebed\AadeMyData\Models\Invoice;
 use Firebed\AadeMyData\Models\InvoiceHeader;
 use Firebed\AadeMyData\Models\PaymentMethodDetail;
 use OxygenSuite\AadeMyData\Enums\NSP;
 use OxygenSuite\AadeMyData\Enums\SignatureDuration;
+use OxygenSuite\AadeMyData\Exceptions\IssueTimeMissingException;
 use OxygenSuite\AadeMyData\Mapping\HeaderMapper;
 use OxygenSuite\AadeMyData\Mapping\PartyMapper;
 use OxygenSuite\AadeMyData\Mapping\SignatureMapper;
@@ -73,23 +73,18 @@ class SignatureMapperTest extends TestCase
     }
 
     /**
-     * The case a naive reuse would get wrong: without an issue time, today's instant is
-     * capped at an earlier dispatch time, which only the shared helper knows about.
+     * A signature attests an instant, so it cannot be issued for a document whose time the
+     * bridge would have to invent — the signature would swear to a time the invoice never
+     * carried, and nothing on the provider validates the pair.
      */
-    public function test_the_issue_instant_matches_when_it_is_capped_by_the_dispatch_time(): void
+    public function test_an_invoice_without_an_issue_time_cannot_be_signed(): void
     {
-        $today = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Athens')))->format('Y-m-d');
-        $header = (new InvoiceHeader())->setSeries('D')->setAa('7')->setIssueDate($today)->setInvoiceType(InvoiceType::TYPE_1_1)
-            ->setDispatchDate($today)->setDispatchTime('00:00:01');
-
         $invoice = Invoices::pos();
-        $invoice->setInvoiceHeader($header);
+        $invoice->getInvoiceHeader()->setIssueTime(null);
 
-        $capped = $today.'T00:00:01+03:00';
-        $this->assertSame($capped, $this->headerIssuedAt($header));
-        $this->assertSame($capped, $this->map($invoice)['invoice_issued_at']);
+        $this->expectException(IssueTimeMissingException::class);
+        $this->map($invoice);
     }
-
     private function map(Invoice $invoice): array
     {
         $payment = $invoice->getPaymentMethods()->first();
