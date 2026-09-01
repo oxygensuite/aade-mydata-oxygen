@@ -4,7 +4,9 @@ namespace OxygenSuite\AadeMyData;
 
 use Firebed\AadeMyData\Http\MyDataRequest;
 use InvalidArgumentException;
+use LogicException;
 use OxygenSuite\AadeMyData\Api\ProviderClient;
+use OxygenSuite\AadeMyData\Signatures\SignatureService;
 
 /**
  * Bootstrap for integrators:
@@ -43,6 +45,24 @@ final class OxygenProvider
     public static function unregister(): void
     {
         MyDataRequest::setGateway(null);
+    }
+
+    /**
+     * POS signatures: a card payment transmitted through the provider must carry a
+     * signature only the provider can issue.
+     *
+     * Read off the registered gateway rather than kept here, so unregistering — or a
+     * per-request gateway — can never leave a stale connection behind.
+     *
+     * @throws LogicException when the provider has not been registered
+     */
+    public static function signatures(): SignatureService
+    {
+        $gateway = MyDataRequest::gateway();
+
+        return $gateway instanceof OxygenGateway
+            ? $gateway->signatures()
+            : throw new LogicException('OxygenProvider::register() must run before POS signatures can be created.');
     }
 
     public static function isRegistered(): bool

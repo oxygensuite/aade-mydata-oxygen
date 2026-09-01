@@ -17,6 +17,7 @@ use Firebed\AadeMyData\Models\InvoiceHeader;
 use Firebed\AadeMyData\Models\InvoiceSummary;
 use Firebed\AadeMyData\Models\Issuer;
 use Firebed\AadeMyData\Models\OtherDeliveryNoteHeader;
+use Firebed\AadeMyData\Models\PaymentMethod as PaymentMethodEntry;
 use Firebed\AadeMyData\Models\PaymentMethodDetail;
 use Firebed\AadeMyData\Models\TransportDetail;
 
@@ -53,6 +54,39 @@ final class Invoices
         return $invoice;
     }
 
+    /**
+     * A retail invoice paid by card: the shape a POS signature is issued for. The issue time
+     * is set so create() and the later send agree on one instant.
+     */
+    public static function pos(): Invoice
+    {
+        $invoice = self::retail();
+        $invoice->getInvoiceHeader()->setIssueTime('10:15:00');
+        $invoice->setPaymentMethods([self::posDetail()]);
+
+        return $invoice;
+    }
+
+    /**
+     * One PaymentMethodsDoc entry for the deferred flow: the card payment of an invoice the
+     * provider already holds.
+     */
+    public static function posPayment(int $mark = 400001, ?string $signature = 'SIGNED'): PaymentMethodEntry
+    {
+        $detail = self::posDetail();
+
+        if ($signature !== null) {
+            $detail->setProvidersSignature(null, $signature);
+        }
+
+        return (new PaymentMethodEntry())->setInvoiceMark($mark)->addPaymentMethodDetails($detail);
+    }
+
+    private static function posDetail(): PaymentMethodDetail
+    {
+        return (new PaymentMethodDetail())->setType(PaymentMethod::METHOD_7)->setAmount(12.4)
+            ->setTid('TID-1')->setTransactionId('TX-1');
+    }
     public static function deliveryNote(): Invoice
     {
         $invoice = new Invoice();

@@ -64,6 +64,27 @@ final class ProviderResponseMapper
         return $this->success(['cancellationMark' => $response->get('cancellation_mark')]);
     }
 
+    /**
+     * From POST /invoices/{id}/payments. A 202 means the payment is stored but its myDATA
+     * transmission is queued, so it answers with a null payment mark — the caller detects
+     * the deferred case exactly as it does for a 202 invoice.
+     */
+    public function forPayments(ProviderResponse $response): Response
+    {
+        if ($response->status !== 201 && $response->status !== 202) {
+            return $this->failure($response);
+        }
+
+        if (! $response->isJson()) {
+            return $this->unreadable($response);
+        }
+
+        return $this->success([
+            'invoiceMark' => $response->get('invoice_mark'),
+            'paymentMethodMark' => $response->get('payment_method_mark'),
+        ]);
+    }
+
     public function forTransportFailure(ProviderException $exception): Response
     {
         return $this->error(self::TECHNICAL_ERROR, [[$exception->getCode(), $exception->getMessage()]]);
@@ -83,9 +104,9 @@ final class ProviderResponseMapper
         return $this->error(self::TECHNICAL_ERROR, [[401, $exception->getMessage()]]);
     }
 
-    public function forMissingMark(): Response
+    public function forMissingMark(string $message): Response
     {
-        return $this->error(self::VALIDATION_ERROR, [[self::CODE_MARK_NOT_FOUND, 'A mark is required to cancel an invoice.']]);
+        return $this->error(self::VALIDATION_ERROR, [[self::CODE_MARK_NOT_FOUND, $message]]);
     }
 
     /**
@@ -120,7 +141,7 @@ final class ProviderResponseMapper
 
     private function failure(ProviderResponse $response): Response
     {
-        $message = $response->message() ?? $this->excerpt($response);
+        $message = $response->message() ?? $response->excerpt();
 
         return match (true) {
             $response->status === 422 => $this->error(self::VALIDATION_ERROR, $this->validationErrors($response, $message)),
@@ -151,15 +172,8 @@ final class ProviderResponseMapper
     private function unreadable(ProviderResponse $response): Response
     {
         return $this->error(self::TECHNICAL_ERROR, [
-            [self::CODE_UNREADABLE_RESPONSE, 'The provider returned an unreadable response: '.$this->excerpt($response)],
+            [self::CODE_UNREADABLE_RESPONSE, 'The provider returned an unreadable response: '.$response->excerpt()],
         ]);
-    }
-
-    private function excerpt(ProviderResponse $response): string
-    {
-        $body = trim($response->rawBody);
-
-        return $body === '' ? sprintf('HTTP %d', $response->status) : mb_substr($body, 0, 500);
     }
 
     /**

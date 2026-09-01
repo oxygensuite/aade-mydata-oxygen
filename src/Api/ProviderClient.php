@@ -97,6 +97,65 @@ final class ProviderClient
     }
 
     /**
+     * The deferred payment flow: payment methods for an invoice the provider already holds.
+     *
+     * @throws ProviderException|UnauthorizedException
+     *
+     * @param array<array-key, mixed> $payload
+     */
+    public function storePayments(string $ulid, array $payload): ProviderResponse
+    {
+        return $this->send('POST', "invoices/$ulid/payments", ['json' => $payload]);
+    }
+
+    /**
+     * @throws ProviderException|UnauthorizedException
+     *
+     * @param array<array-key, mixed> $payload
+     */
+    public function storeSignature(array $payload): ProviderResponse
+    {
+        return $this->send('POST', 'signatures', ['json' => $payload]);
+    }
+
+    /**
+     * @throws ProviderException|UnauthorizedException
+     */
+    public function showSignature(string $ulid): ProviderResponse
+    {
+        return $this->send('GET', "signatures/$ulid");
+    }
+
+    /**
+     * Signatures are immutable; cancelling one is a delete.
+     *
+     * @throws ProviderException|UnauthorizedException
+     */
+    public function cancelSignature(string $ulid): ProviderResponse
+    {
+        return $this->send('DELETE', "signatures/$ulid");
+    }
+
+    /**
+     * @throws ProviderException|UnauthorizedException
+     *
+     * @param array<string, scalar> $filters
+     */
+    public function findSignatures(array $filters): ProviderResponse
+    {
+        return $this->send('GET', 'signatures', ['query' => $filters]);
+    }
+
+    /**
+     * The profile of the company the token belongs to.
+     *
+     * @throws ProviderException|UnauthorizedException
+     */
+    public function showCompany(): ProviderResponse
+    {
+        return $this->send('GET', 'company');
+    }
+    /**
      * @throws ProviderException|UnauthorizedException
      *
      * @param array<string, mixed> $options

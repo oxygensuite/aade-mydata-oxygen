@@ -43,6 +43,24 @@ class ProviderClientTest extends TestCase
         $this->assertSame('POST https://sandbox-api.mydataprovider.gr/v2/invoices/cancel', $this->describe(3));
     }
 
+    public function test_signature_and_payment_endpoints(): void
+    {
+        $client = $this->providerClient(array_fill(0, 6, new Response(200, [], '{}')));
+
+        $client->storeSignature(['nsp' => 1]);
+        $client->showSignature('01SIG');
+        $client->cancelSignature('01SIG');
+        $client->findSignatures(['status' => 'pending', 'page' => 2]);
+        $client->storePayments('01ABC', ['payments' => []]);
+        $client->showCompany();
+
+        $this->assertSame('POST https://sandbox-api.mydataprovider.gr/v2/signatures', $this->describe(0));
+        $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/signatures/01SIG', $this->describe(1));
+        $this->assertSame('DELETE https://sandbox-api.mydataprovider.gr/v2/signatures/01SIG', $this->describe(2));
+        $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/signatures?status=pending&page=2', $this->describe(3));
+        $this->assertSame('POST https://sandbox-api.mydataprovider.gr/v2/invoices/01ABC/payments', $this->describe(4));
+        $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/company', $this->describe(5));
+    }
     public function test_base_url_may_be_resolved_lazily(): void
     {
         $base = 'https://sandbox-api.mydataprovider.gr/v2';

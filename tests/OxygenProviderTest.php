@@ -5,9 +5,11 @@ namespace Tests;
 use Firebed\AadeMyData\Http\GuzzleGateway;
 use Firebed\AadeMyData\Http\MyDataRequest;
 use InvalidArgumentException;
+use LogicException;
 use OxygenSuite\AadeMyData\Endpoints;
 use OxygenSuite\AadeMyData\OxygenGateway;
 use OxygenSuite\AadeMyData\OxygenProvider;
+use OxygenSuite\AadeMyData\Signatures\SignatureService;
 
 class OxygenProviderTest extends TestCase
 {
@@ -24,6 +26,31 @@ class OxygenProviderTest extends TestCase
         $this->assertFalse(OxygenProvider::isRegistered());
     }
 
+    public function test_signatures_are_reachable_once_the_provider_is_registered(): void
+    {
+        OxygenProvider::register('token');
+
+        $this->assertInstanceOf(SignatureService::class, OxygenProvider::signatures());
+    }
+
+    /**
+     * Read off the registered gateway, so unregistering cannot leave a signature service
+     * pointing at a connection the ERP has already switched away from.
+     */
+    public function test_signatures_are_unreachable_without_a_registered_provider(): void
+    {
+        foreach (['never registered', 'after unregister'] as $case) {
+            try {
+                OxygenProvider::signatures();
+                $this->fail("expected a LogicException $case");
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('register()', $e->getMessage());
+            }
+
+            OxygenProvider::register('token');
+            OxygenProvider::unregister();
+        }
+    }
     public function test_base_url_follows_the_package_environment_unless_env_is_given(): void
     {
         OxygenProvider::register('token');

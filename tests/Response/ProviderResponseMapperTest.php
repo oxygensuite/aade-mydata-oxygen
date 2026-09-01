@@ -97,7 +97,7 @@ class ProviderResponseMapperTest extends TestCase
     {
         $transport = $this->mapper->forTransportFailure(new ProviderException('cURL error 28', ProviderException::TIMED_OUT));
         $unknown = $this->mapper->forMarkNotFound(new MarkNotFoundException('400009'));
-        $missing = $this->mapper->forMissingMark();
+        $missing = $this->mapper->forMissingMark('A mark is required to cancel an invoice.');
 
         $this->assertSame('TechnicalError', $transport->getStatusCode());
         $this->assertSame([['28', 'cURL error 28']], $this->errors($transport));
@@ -106,6 +106,55 @@ class ProviderResponseMapperTest extends TestCase
         $this->assertSame([['9001', 'A mark is required to cancel an invoice.']], $this->errors($missing));
     }
 
+    public function test_payments_201_is_success_with_both_marks(): void
+    {
+        $response = $this->mapper->forPayments(new ProviderResponse(201, '{"invoice_mark":400001,"payment_method_mark":500001,"invoice_total":12.4,"total_paid_amount":12.4,"total_unpaid_amount":0}'));
+
+        $this->assertTrue($response->isSuccessful());
+        $this->assertSame('400001', $response->getInvoiceMark());
+        $this->assertSame('500001', $response->getPaymentMethodMark());
+    }
+
+    /**
+     * The payment is stored; only its myDATA transmission is queued, so the invoice mark is
+     * there and the payment mark is not.
+     */
+    public function test_payments_202_is_success_without_a_payment_mark(): void
+    {
+        $response = $this->mapper->forPayments(new ProviderResponse(202, '{"invoice_mark":400001,"payment_method_mark":null,"invoice_total":12.4}'));
+
+        $this->assertTrue($response->isSuccessful());
+        $this->assertSame('400001', $response->getInvoiceMark());
+        $this->assertNull($response->getPaymentMethodMark());
+    }
+
+    public function test_payments_relay_field_errors_and_mydata_codes(): void
+    {
+        $response = $this->mapper->forPayments(new ProviderResponse(422, '{"message":"invalid","errors":{"payments.0.signature":["The signature is invalid."],"304":["Payment method already submitted"]}}'));
+
+        $this->assertSame('ValidationError', $response->getStatusCode());
+        $this->assertSame([
+            ['422', 'payments.0.signature: The signature is invalid.'],
+            ['304', 'Payment method already submitted'],
+        ], array_map(fn ($e) => [$e->getCode(), $e->getMessage()], $response->getErrors()->all()));
+    }
+
+    public function test_payments_service_unavailable_is_a_technical_error(): void
+    {
+        $response = $this->mapper->forPayments(new ProviderResponse(503, '{"message":"Service unavailable. Please try again later."}'));
+
+        $this->assertSame('TechnicalError', $response->getStatusCode());
+        $this->assertSame('503', $response->getErrors()->first()->getCode());
+        $this->assertSame('Service unavailable. Please try again later.', $response->getErrors()->first()->getMessage());
+    }
+
+    public function test_payments_2xx_without_json_is_a_technical_error(): void
+    {
+        $response = $this->mapper->forPayments(new ProviderResponse(201, '<html>oops</html>'));
+
+        $this->assertSame('TechnicalError', $response->getStatusCode());
+        $this->assertSame('9002', $response->getErrors()->first()->getCode());
+    }
     public function test_cancel_success(): void
     {
         $cancel = $this->mapper->forCancel(new ProviderResponse(200, '{"cancellation_mark":400002,"cancelled_at":"2026-08-27T10:00:00+03:00"}'));

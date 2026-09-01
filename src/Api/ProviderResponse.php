@@ -65,6 +65,16 @@ final class ProviderResponse
     }
 
     /**
+     * A short printable form of the body for an error message, or the bare status when the
+     * body is empty.
+     */
+    public function excerpt(int $limit = 500): string
+    {
+        $body = trim($this->rawBody);
+
+        return $body === '' ? sprintf('HTTP %d', $this->status) : mb_substr($body, 0, $limit);
+    }
+    /**
      * The id (ulid) of the first record in a paginated index response.
      */
     public function firstId(): ?string

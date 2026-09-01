@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/firebed/aade-mydata.git",
-                "reference": "0acc5014440492520157253ec002395811c54c7c"
+                "reference": "63082eea3b38e584756c9964a247cb330954c6ed"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/firebed/aade-mydata/zipball/0acc5014440492520157253ec002395811c54c7c",
-                "reference": "0acc5014440492520157253ec002395811c54c7c",
+                "url": "https://api.github.com/repos/firebed/aade-mydata/zipball/63082eea3b38e584756c9964a247cb330954c6ed",
+                "reference": "63082eea3b38e584756c9964a247cb330954c6ed",
                 "shasum": ""
             },
             "require": {
@@ -67,7 +67,7 @@
                 "source": "https://github.com/firebed/aade-mydata/tree/feature/gateway",
                 "issues": "https://github.com/firebed/aade-mydata/issues"
             },
-            "time": "2026-09-01T09:22:49+00:00"
+            "time": "2026-09-01T11:10:32+00:00"
         },
         {
             "name": "guzzlehttp/guzzle",

@@ -227,6 +227,39 @@ class OxygenGatewayTest extends TestCase
         $this->assertSame('2026-08-27T10:15:00+03:00', $this->requestJson(0)['header']['issued_at']);
     }
 
+    public function test_a_pos_signature_reaches_the_provider_on_the_invoice(): void
+    {
+        $this->registerGateway([new Response(201, [], '{"uid":"U","mark":400001,"url":"u"}')]);
+        $invoice = Invoices::pos();
+        $invoice->getPaymentMethods()->first()->setProvidersSignature(null, 'MEUCIQ==');
+
+        (new SendInvoices())->handle($invoice);
+
+        $this->assertSame('MEUCIQ==', $this->requestJson(0)['payment_methods'][0]['signature']);
+        // The provider reads the terminal id off the signature it issued.
+        $this->assertArrayNotHasKey('tid', $this->requestJson(0)['payment_methods'][0]);
+    }
+
+    /**
+     * Re-sending an invoice the provider already holds also trips the "signature already
+     * used" rule, so the duplicate recovery has to keep working with both errors present.
+     */
+    public function test_duplicate_recovery_survives_a_signature_already_used_error(): void
+    {
+        $uid = str_repeat('A1', 20);
+        $this->registerGateway([
+            new Response(422, [], '{"message":"invalid","errors":{"uid":["Invoice with uid '.$uid.' already submitted."],"payment_methods.0.signature":["Some signatures have already been used."]}}'),
+            new Response(200, [], '{"data":[{"id":"01STORED"}]}'),
+            new Response(200, [], '{"uid":"'.$uid.'","mark":400777,"authentication_code":"AUTH","url":"https://iview.test/x"}'),
+        ]);
+        $invoice = Invoices::pos();
+        $invoice->getPaymentMethods()->first()->setProvidersSignature(null, 'MEUCIQ==');
+
+        $response = (new SendInvoices())->handle($invoice)->first();
+
+        $this->assertTrue($response->isSuccessful());
+        $this->assertSame('400777', $response->getInvoiceMark());
+    }
     public function test_a_send_invoices_request_without_models_is_rejected(): void
     {
         $gateway = $this->registerGateway([]);

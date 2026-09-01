@@ -1,9 +1,10 @@
 # Oxygen Provider bridge for `firebed/aade-mydata`
 
-Routes `SendInvoices` and `CancelInvoice` from [`firebed/aade-mydata`](https://github.com/firebed/aade-mydata)
-through the **Oxygen e-invoicing provider** (mydataprovider v2 API) — with no changes to the
-code that builds and sends your invoices. Every other package request (RequestDocs,
-RequestTransmittedDocs, classifications, payment methods, …) keeps talking to AADE directly.
+Routes `SendInvoices`, `CancelInvoice` and `SendPaymentsMethod` from
+[`firebed/aade-mydata`](https://github.com/firebed/aade-mydata) through the **Oxygen
+e-invoicing provider** (mydataprovider v2 API) — with no changes to the code that builds
+and sends your invoices. Every other package request (RequestDocs, RequestTransmittedDocs,
+classifications, …) keeps talking to AADE directly.
 
 ΑΑΔΕ is retiring the ERP transmission channel: invoices must be transmitted through a
 licensed provider. Install this package, register your provider token, and your existing
@@ -54,6 +55,7 @@ Your AADE credentials are never sent to the provider.
 |---|---|
 | `SendInvoices::handle()` | one `POST /v2/invoices` **per invoice**, in order (or `POST /v2/invoices/cancel` for an 8.6 total cancellation with `totalCancelDeliveryOrders`) |
 | `CancelInvoice::handle($mark)` | `GET /v2/invoices?mark=…` then `PATCH /v2/invoices/{id}/cancel` |
+| `SendPaymentsMethod::handle()` | `GET /v2/invoices?mark=…` then one `POST /v2/invoices/{id}/payments` **per `PaymentMethod`**, in order |
 | everything else | AADE myDATA, unchanged |
 
 `correlatedInvoices` / `multipleConnectedMarks` are looked up in the provider
@@ -78,6 +80,11 @@ You still get a `ResponseDoc` with one `Response` per invoice, in submission ord
 | 423 / 429 / 5xx | `TechnicalError` | code = HTTP status |
 | unreachable / timeout | `TechnicalError` | code `0` (connection) or `28` (timeout) |
 | 401 | — | throws `MyDataAuthenticationException` |
+
+`SendPaymentsMethod` answers the same way: `201` → `Success` with `getInvoiceMark()` and
+`getPaymentMethodMark()`; `202` → `Success` with `getPaymentMethodMark()` **null**, the
+payment is stored and its myDATA transmission is queued; `422` → `ValidationError`; `503` →
+`TechnicalError`.
 
 Bridge-specific codes: `9001` — a referenced mark is unknown to the provider (e.g. an
 invoice transmitted through the ERP channel before you switched); `9002` — the provider
@@ -135,10 +142,115 @@ unit — the provider requires both fields, so an incomplete line comes back as 
 The same applies to the values the provider fills in itself: a missing `series`, a missing
 issuer `branch_code` and every line's `total_amount` are left out of the payload.
 
+## POS payments (provider signature)
+
+A card payment transmitted through a provider must carry the **provider's** signature —
+signed with the provider's own ΥΠΑΗΕΣ key, which is why an ERP cannot compute it and why
+`ECRToken`, the ΦΗΜ/ERP-channel equivalent, no longer applies. Ask the provider for one, then
+hand it to the payment method:
+
+```php
+use Firebed\AadeMyData\Enums\PaymentMethod as PaymentType;
+use Firebed\AadeMyData\Models\PaymentMethod;
+use Firebed\AadeMyData\Models\PaymentMethodDetail;
+use OxygenSuite\AadeMyData\Enums\NSP;
+use OxygenSuite\AadeMyData\Enums\SignatureDuration;
+use OxygenSuite\AadeMyData\OxygenProvider;
+
+$payment = PaymentMethodDetail::make()
+    ->setType(PaymentType::METHOD_7)     // 7 = POS, 8 = IRIS
+    ->setAmount(12.4)
+    ->setTid('TERM001')                  // the POS terminal id — required, set it before signing
+    ->setTransactionId('abc-123');
+
+$invoice->addPaymentMethod($payment);
+
+$signature = OxygenProvider::signatures()->create($invoice, $payment, NSP::VIVA, SignatureDuration::HOURS_60);
+
+$payment->setProvidersSignature(null, $signature->signature);
+
+(new SendInvoices())->handle($invoice);
+```
+
+The signing author is left `null` on purpose: the provider stamps its own ΥΠΑΗΕΣ decision
+number when it builds the myDATA XML. The `tid` is not sent on the document either — the
+provider reads the terminal id back off the signature — so it travels exactly once, at
+signing time.
+
+`NSP` names the network the payment actually went through (`VIVA`, `WEB_ECR`, `WORLDLINE`,
+`EDPS`, `EPAY_SOFT_POS`); it selects how the provider assembles the text it signs.
+`SignatureDuration` is how long the signature stays usable — `HOURS_60` or `HOURS_2`.
+Everything else in the request is read off the models you already built: the issuer, the
+header, the invoice totals, the payment's amount and its `tid`.
+
+**Set `setIssueTime()` on a POS invoice.** The signature attests an issue instant and its uid
+is generated from it, so `create()` and the later `handle()` must agree on one. Without an
+issue time each call stamps the current Athens time, so the two differ — and across midnight
+the invoice is rejected outright. If your ERP really has no issue time, pin the one the
+signature used:
+
+```php
+$invoice->getInvoiceHeader()->setIssueTime($signature->invoiceIssuedAt->format('H:i:s'));
+```
+
+### Paying an invoice that was already transmitted
+
+`SendPaymentsMethod` now goes through the provider too. The provider requires the signature's
+mark to match the invoice's, so put the mark on the invoice before signing:
+
+```php
+$mark = (new SendInvoices())->handle($invoice)->first()->getInvoiceMark();
+$invoice->set('mark', $mark);
+
+$signature = OxygenProvider::signatures()->create($invoice, $payment, NSP::VIVA, SignatureDuration::HOURS_60);
+$payment->setProvidersSignature(null, $signature->signature);
+
+(new SendPaymentsMethod())->handle(
+    PaymentMethod::make()->setInvoiceMark((int) $mark)->addPaymentMethodDetails($payment)
+);
+```
+
+Signing a document this process did not build needs only the fields the payload is made of:
+the issuer (`vatNumber`, `branch`), the header (`series`, `aa`, `issueDate`, `issueTime`,
+`invoiceType`), the summary totals, and the `mark`.
+
+`entityVatNumber` is used when you set it; otherwise the bridge asks the provider which
+company the token belongs to (`GET /v2/company`, once per registration). Note the deferred
+endpoint is stricter than `POST /invoices`: every amount must be at least `0.01`, payment type
+5 is refused, and `signature` and `transaction_id` are required on types 7 and 8 and
+prohibited on every other.
+
+### Managing signatures
+
+```php
+$signatures = OxygenProvider::signatures();
+
+$signature = $signatures->find($id);      // by the id the provider gave it
+$signatures->cancel($id);                 // release one that will not be used
+$signatures->pending();                   // unexpired and not yet used, newest first, 100 per page
+```
+
+A signature is **single use** — the first invoice or payment that references it burns it — and
+it **cannot be renewed**, only replaced, so transmit promptly and prefer `HOURS_60` when a
+queue sits between issuing and sending. `pending()` is the recovery tool: `create()` has no
+idempotency, so after a lost answer look there for the signature that may already exist
+instead of creating a second one. A duplicate carries the same `uid`, since the uid is
+generated from the same invoice fields; cancel the one you do not use.
+
+| Outcome | What you get |
+|---|---|
+| the provider refused | `SignatureException` — `getCode()` is the HTTP status, `$e->errors` the field messages (in Greek) |
+| your issuer VAT is not the token's company | `SignatureException` with code **403** and no field information: the provider authorises before it validates |
+| the signature is expired, used or unknown | a `ValidationError` on the invoice or payment naming `signature` |
+| the provider could not be reached | `ProviderException` — the signature may or may not exist, so look it up rather than retrying |
+| the token was rejected | `MyDataAuthenticationException`, as everywhere else |
+
 ## Limitations
 
-- POS payments: `tid`, `ProvidersSignature`, `ECRToken` are not forwarded — register
-  signatures through the provider's `/signatures` API.
+- POS payments: the provider fills in `ProvidersSignature.SigningAuthor` itself and reads
+  the `tid` off the signature, so neither is forwarded on the document. `ECRToken` (the ERP
+  channel's own signature) and `ProvidersSignature.EndToEndReferenceID` (the IRIS request
+  reference) have no provider equivalent and are dropped.
 - Fields with no provider equivalent are dropped: `invoiceVariationType`, `discountOption`,
   myDATA v2.0.2 header fields (`toWeigh`, `receivingNotePurpose`, …), Digital Goods Movement
   fields, and service-filled fields (`uid`, `mark`, `qrCodeUrl`, …).
@@ -161,7 +273,7 @@ the oldest PHP the package supports.
 Until `firebed/aade-mydata` 5.11.0 is tagged, `composer.json` requires
 `dev-feature/gateway` through a `vcs` repository on
 [github.com/firebed/aade-mydata](https://github.com/firebed/aade-mydata) — the branch that
-carries the `Gateway` seam, `SendInvoices::getInvoicesDoc()`, `InvoiceHeader::setIssueTime()`
-and `InvoiceDetails::setUnitPrice()`. Replace the constraint with `^5.11` and drop the
+carries the `Gateway` seam, `SendInvoices::getInvoicesDoc()`, `InvoiceHeader::setIssueTime()`,
+`InvoiceDetails::setUnitPrice()` and `SendPaymentsMethod::getPaymentMethodsDoc()`. Replace the constraint with `^5.11` and drop the
 `repositories` entry once the tag is out; the bridge cannot be published to Packagist while
 it requires a branch.
