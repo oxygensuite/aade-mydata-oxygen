@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e2531dd7ae31a44a21c95d549958e758",
+    "content-hash": "ab8d4daa1acd7372d7f9ef11f090b664",
     "packages": [
         {
             "name": "firebed/aade-mydata",
-            "version": "dev-feature/gateway",
+            "version": "v5.11.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/firebed/aade-mydata.git",
-                "reference": "63082eea3b38e584756c9964a247cb330954c6ed"
+                "reference": "e449858170983f5992c9e30733ae78745380ab2b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/firebed/aade-mydata/zipball/63082eea3b38e584756c9964a247cb330954c6ed",
-                "reference": "63082eea3b38e584756c9964a247cb330954c6ed",
+                "url": "https://api.github.com/repos/firebed/aade-mydata/zipball/e449858170983f5992c9e30733ae78745380ab2b",
+                "reference": "e449858170983f5992c9e30733ae78745380ab2b",
                 "shasum": ""
             },
             "require": {
@@ -38,16 +38,7 @@
                     "Firebed\\AadeMyData\\": "src/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Tests\\": "tests/"
-                }
-            },
-            "scripts": {
-                "test": [
-                    "phpunit"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -59,15 +50,15 @@
             ],
             "description": "Implementation of requests for AADE myDATA.",
             "keywords": [
-                "AADE",
+                "aade",
                 "myDATA",
                 "ΑΑΔΕ"
             ],
             "support": {
-                "source": "https://github.com/firebed/aade-mydata/tree/feature/gateway",
-                "issues": "https://github.com/firebed/aade-mydata/issues"
+                "issues": "https://github.com/firebed/aade-mydata/issues",
+                "source": "https://github.com/firebed/aade-mydata/tree/v5.11.0"
             },
-            "time": "2026-09-01T11:10:32+00:00"
+            "time": "2026-09-09T08:58:43+00:00"
         },
         {
             "name": "guzzlehttp/guzzle",
@@ -2662,9 +2653,7 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "firebed/aade-mydata": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

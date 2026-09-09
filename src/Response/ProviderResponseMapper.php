@@ -9,14 +9,13 @@ use OxygenSuite\AadeMyData\Api\ProviderException;
 use OxygenSuite\AadeMyData\Api\ProviderResponse;
 use OxygenSuite\AadeMyData\Api\UnauthorizedException;
 use OxygenSuite\AadeMyData\Exceptions\IssueTimeMissingException;
-use OxygenSuite\AadeMyData\Exceptions\MarkNotFoundException;
 
 /**
  * Translates provider outcomes into the package's Response model (see spec §7).
  */
 final class ProviderResponseMapper
 {
-    /** Bridge-originated: a referenced mark is unknown to the provider. */
+    /** Bridge-originated: the provider does not hold the invoice a mark names (or no mark was given). */
     public const CODE_MARK_NOT_FOUND = '9001';
 
     /** Bridge-originated: the provider answered 2xx with a body that is not JSON. */
@@ -55,10 +54,13 @@ final class ProviderResponseMapper
             : $this->forStore($rejection);
     }
 
-    public function forCancel(ProviderResponse $response): Response
+    /**
+     * From PATCH /invoices/{mark}/cancel.
+     */
+    public function forCancel(ProviderResponse $response, string $mark): Response
     {
         if (! $response->isSuccessful()) {
-            return $this->failure($response);
+            return $this->failure($response, $mark);
         }
 
         if (! $response->isJson()) {
@@ -69,14 +71,14 @@ final class ProviderResponseMapper
     }
 
     /**
-     * From POST /invoices/{id}/payments. A 202 means the payment is stored but its myDATA
+     * From POST /invoices/{mark}/payments. A 202 means the payment is stored but its myDATA
      * transmission is queued, so it answers with a null payment mark — the caller detects
      * the deferred case exactly as it does for a 202 invoice.
      */
-    public function forPayments(ProviderResponse $response): Response
+    public function forPayments(ProviderResponse $response, string $mark): Response
     {
         if ($response->status !== 201 && $response->status !== 202) {
-            return $this->failure($response);
+            return $this->failure($response, $mark);
         }
 
         if (! $response->isJson()) {
@@ -92,11 +94,6 @@ final class ProviderResponseMapper
     public function forTransportFailure(ProviderException $exception): Response
     {
         return $this->error(self::TECHNICAL_ERROR, [[$exception->getCode(), $exception->getMessage()]]);
-    }
-
-    public function forMarkNotFound(MarkNotFoundException $exception): Response
-    {
-        return $this->error(self::VALIDATION_ERROR, [[self::CODE_MARK_NOT_FOUND, $exception->getMessage()]]);
     }
 
     /**
@@ -117,7 +114,12 @@ final class ProviderResponseMapper
         return $this->error(self::VALIDATION_ERROR, [[self::CODE_ISSUE_TIME_MISSING, $exception->getMessage()]]);
     }
 
-    public function forMissingMark(string $message): Response
+    /**
+     * 9001: the provider does not hold the invoice — no mark was given, or the mark is one it
+     * never issued (typically a document transmitted through the ERP channel before the
+     * switch), which the by-mark routes report as a 404.
+     */
+    public function forMarkNotFound(string $message): Response
     {
         return $this->error(self::VALIDATION_ERROR, [[self::CODE_MARK_NOT_FOUND, $message]]);
     }
@@ -152,11 +154,15 @@ final class ProviderResponseMapper
         ]);
     }
 
-    private function failure(ProviderResponse $response): Response
+    /**
+     * @param string|null $mark set by the routes addressed by mark, where a 404 means the mark is unknown
+     */
+    private function failure(ProviderResponse $response, ?string $mark = null): Response
     {
         $message = $response->message() ?? $response->excerpt();
 
         return match (true) {
+            $response->status === 404 && $mark !== null => $this->forMarkNotFound(sprintf('Invoice with mark %s was not found in the provider.', $mark)),
             $response->status === 422 => $this->error(self::VALIDATION_ERROR, $this->validationErrors($response, $message)),
             $response->status === 403, $response->status === 404 => $this->error(self::VALIDATION_ERROR, [[$response->status, $message]]),
             default => $this->error(self::TECHNICAL_ERROR, [[$response->status, $message]]),

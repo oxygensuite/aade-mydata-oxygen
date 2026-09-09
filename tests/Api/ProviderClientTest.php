@@ -32,12 +32,12 @@ class ProviderClientTest extends TestCase
     {
         $client = $this->providerClient([new Response(200, [], '{}'), new Response(200, [], '{}'), new Response(200, [], '{}'), new Response(201, [], '{}')]);
 
-        $client->findInvoices(['mark' => '400001']);
+        $client->findInvoices(['uid' => 'ABC']);
         $client->showInvoice('01ABC');
         $client->cancelInvoice('01ABC');
         $client->cancelCateringDocuments(['x' => 1]);
 
-        $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/invoices?mark=400001', $this->describe(0));
+        $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/invoices?uid=ABC', $this->describe(0));
         $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/invoices/01ABC', $this->describe(1));
         $this->assertSame('PATCH https://sandbox-api.mydataprovider.gr/v2/invoices/01ABC/cancel', $this->describe(2));
         $this->assertSame('POST https://sandbox-api.mydataprovider.gr/v2/invoices/cancel', $this->describe(3));

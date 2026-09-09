@@ -10,6 +10,8 @@ use GuzzleHttp\Exception\GuzzleException;
 /**
  * Thin wrapper over the mydataprovider v2 endpoints the bridge needs.
  * HTTP errors are returned as ProviderResponse; only 401 and transport failures throw.
+ * An `{invoice}` path segment is the provider's id or the document's myDATA mark: the
+ * provider binds either.
  */
 final class ProviderClient
 {
@@ -83,17 +85,17 @@ final class ProviderClient
     /**
      * @throws ProviderException|UnauthorizedException
      */
-    public function showInvoice(string $ulid): ProviderResponse
+    public function showInvoice(string $invoice): ProviderResponse
     {
-        return $this->send('GET', "invoices/$ulid");
+        return $this->send('GET', "invoices/$invoice");
     }
 
     /**
      * @throws ProviderException|UnauthorizedException
      */
-    public function cancelInvoice(string $ulid): ProviderResponse
+    public function cancelInvoice(string $invoice): ProviderResponse
     {
-        return $this->send('PATCH', "invoices/$ulid/cancel");
+        return $this->send('PATCH', "invoices/$invoice/cancel");
     }
 
     /**
@@ -103,9 +105,9 @@ final class ProviderClient
      *
      * @param array<array-key, mixed> $payload
      */
-    public function storePayments(string $ulid, array $payload): ProviderResponse
+    public function storePayments(string $invoice, array $payload): ProviderResponse
     {
-        return $this->send('POST', "invoices/$ulid/payments", ['json' => $payload]);
+        return $this->send('POST', "invoices/$invoice/payments", ['json' => $payload]);
     }
 
     /**

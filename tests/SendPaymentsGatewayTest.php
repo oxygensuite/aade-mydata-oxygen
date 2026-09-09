@@ -14,16 +14,13 @@ use Tests\Fixtures\Invoices;
 
 class SendPaymentsGatewayTest extends TestCase
 {
-    private const FOUND = '{"data":[{"id":"01ABC"}]}';
-
-    private const COMPANY = '{"id":"01C","vat_number":"123456789"}';
+    private const COMPANY = '{"data":{"id":"01C","vat_number":"123456789"}}';
 
     private const STORED = '{"invoice_mark":400001,"payment_method_mark":500001,"invoice_total":12.4,"total_paid_amount":12.4,"total_unpaid_amount":0}';
 
     public function test_a_payment_is_posted_to_the_invoice_the_mark_names(): void
     {
         $this->registerGateway([
-            new Response(200, [], self::FOUND),
             new Response(200, [], self::COMPANY),
             new Response(201, [], self::STORED),
         ]);
@@ -37,41 +34,51 @@ class SendPaymentsGatewayTest extends TestCase
         $this->assertSame('400001', $doc[0]->getInvoiceMark());
         $this->assertSame('500001', $doc[0]->getPaymentMethodMark());
 
-        $this->assertSame('https://sandbox-api.mydataprovider.gr/v2/invoices?mark=400001', (string) $this->history[0]['request']->getUri());
-        $this->assertSame('https://sandbox-api.mydataprovider.gr/v2/company', (string) $this->history[1]['request']->getUri());
-        $this->assertSame('POST', $this->history[2]['request']->getMethod());
-        $this->assertSame('https://sandbox-api.mydataprovider.gr/v2/invoices/01ABC/payments', (string) $this->history[2]['request']->getUri());
+        $this->assertCount(2, $this->history);
+        $this->assertSame('https://sandbox-api.mydataprovider.gr/v2/company', (string) $this->history[0]['request']->getUri());
+        $this->assertSame('POST', $this->history[1]['request']->getMethod());
+        $this->assertSame('https://sandbox-api.mydataprovider.gr/v2/invoices/400001/payments', (string) $this->history[1]['request']->getUri());
         $this->assertSame([
             'issuer_vat_number' => '123456789',
             'payments' => [['type' => 7, 'amount' => 12.4, 'transaction_id' => 'TX-1', 'signature' => 'SIGNED']],
-        ], $this->requestJson(2));
+        ], $this->requestJson(1));
 
         $this->assertStringContainsString('<PaymentMethodsDoc', $request->getRequestXml());
         $this->assertStringContainsString('<paymentMethodMark>500001</paymentMethodMark>', $request->getResponseXML());
     }
 
+    public function test_extra_fields_on_a_payment_method_are_forwarded(): void
+    {
+        $this->registerGateway([new Response(200, [], self::COMPANY), new Response(201, [], self::STORED)]);
+
+        $payment = Invoices::posPayment();
+        $payment->getPaymentMethodDetails()[0]->setExtraFields(['terminal' => 'T1']);
+        (new SendPaymentsMethod())->handle($payment);
+
+        $this->assertSame(['terminal' => 'T1'], $this->requestJson(1)['payments'][0]['extra_fields']);
+    }
+
     public function test_the_entity_vat_number_is_used_when_the_erp_set_one(): void
     {
-        $this->registerGateway([new Response(200, [], self::FOUND), new Response(201, [], self::STORED)]);
+        $this->registerGateway([new Response(201, [], self::STORED)]);
 
         $payment = Invoices::posPayment()->setEntityVatNumber('999888777');
         (new SendPaymentsMethod())->handle($payment);
 
-        $this->assertCount(2, $this->history);
-        $this->assertSame('999888777', $this->requestJson(1)['issuer_vat_number']);
+        $this->assertCount(1, $this->history);
+        $this->assertSame('999888777', $this->requestJson(0)['issuer_vat_number']);
     }
 
     public function test_an_empty_entity_vat_number_falls_back_to_the_company(): void
     {
         $this->registerGateway([
-            new Response(200, [], self::FOUND),
             new Response(200, [], self::COMPANY),
             new Response(201, [], self::STORED),
         ]);
 
         (new SendPaymentsMethod())->handle(Invoices::posPayment()->setEntityVatNumber(''));
 
-        $this->assertSame('123456789', $this->requestJson(2)['issuer_vat_number']);
+        $this->assertSame('123456789', $this->requestJson(1)['issuer_vat_number']);
     }
 
     /**
@@ -80,7 +87,6 @@ class SendPaymentsGatewayTest extends TestCase
     public function test_the_company_is_looked_up_once_for_the_whole_batch(): void
     {
         $this->registerGateway([
-            new Response(200, [], self::FOUND),
             new Response(200, [], self::COMPANY),
             new Response(201, [], self::STORED),
             new Response(201, [], self::STORED),
@@ -88,9 +94,9 @@ class SendPaymentsGatewayTest extends TestCase
 
         (new SendPaymentsMethod())->handle([Invoices::posPayment(), Invoices::posPayment()]);
 
-        // mark lookup, company, two payments — the mark is memoized too.
-        $this->assertCount(4, $this->history);
-        $this->assertSame('/v2/invoices/01ABC/payments', $this->history[3]['request']->getUri()->getPath());
+        // company, then two payments.
+        $this->assertCount(3, $this->history);
+        $this->assertSame('/v2/invoices/400001/payments', $this->history[2]['request']->getUri()->getPath());
     }
 
     /**
@@ -99,7 +105,6 @@ class SendPaymentsGatewayTest extends TestCase
     public function test_a_queued_transmission_is_successful_without_a_payment_mark(): void
     {
         $this->registerGateway([
-            new Response(200, [], self::FOUND),
             new Response(200, [], self::COMPANY),
             new Response(202, [], '{"invoice_mark":400001,"payment_method_mark":null,"invoice_total":12.4}'),
         ]);
@@ -114,7 +119,6 @@ class SendPaymentsGatewayTest extends TestCase
     public function test_provider_validation_errors_are_relayed(): void
     {
         $this->registerGateway([
-            new Response(200, [], self::FOUND),
             new Response(200, [], self::COMPANY),
             new Response(422, [], '{"message":"invalid","errors":{"payments.0.signature":["The signature is invalid."]}}'),
         ]);
@@ -128,7 +132,6 @@ class SendPaymentsGatewayTest extends TestCase
     public function test_the_provider_being_unavailable_is_a_technical_error(): void
     {
         $this->registerGateway([
-            new Response(200, [], self::FOUND),
             new Response(200, [], self::COMPANY),
             new Response(503, [], '{"message":"Service unavailable. Please try again later."}'),
         ]);
@@ -152,11 +155,12 @@ class SendPaymentsGatewayTest extends TestCase
     }
 
     /**
-     * A document transmitted through the ERP channel before the switch cannot be paid here.
+     * A document transmitted through the ERP channel before the switch cannot be paid here:
+     * the provider binds the path by mark and answers 404.
      */
     public function test_a_mark_the_provider_does_not_know_is_a_validation_error(): void
     {
-        $this->registerGateway([new Response(200, [], '{"data":[]}')]);
+        $this->registerGateway([new Response(200, [], self::COMPANY), new Response(404, [], '{"message":"Not found."}')]);
 
         $response = (new SendPaymentsMethod())->handle(Invoices::posPayment(400999))->first();
 
@@ -168,7 +172,6 @@ class SendPaymentsGatewayTest extends TestCase
     public function test_a_failed_company_lookup_is_a_technical_error_and_the_batch_continues(): void
     {
         $this->registerGateway([
-            new Response(200, [], self::FOUND),
             new Response(500, [], '{"message":"boom"}'),
             new Response(200, [], self::COMPANY),
             new Response(201, [], self::STORED),
@@ -185,7 +188,6 @@ class SendPaymentsGatewayTest extends TestCase
     public function test_a_transport_failure_becomes_a_technical_error_and_the_batch_continues(): void
     {
         $this->registerGateway([
-            new Response(200, [], self::FOUND),
             new Response(200, [], self::COMPANY),
             new ConnectException('Connection refused', new Request('POST', 'payments')),
             new Response(201, [], self::STORED),
@@ -201,7 +203,6 @@ class SendPaymentsGatewayTest extends TestCase
     public function test_a_token_revoked_mid_batch_keeps_the_marks_already_earned(): void
     {
         $this->registerGateway([
-            new Response(200, [], self::FOUND),
             new Response(200, [], self::COMPANY),
             new Response(201, [], self::STORED),
             new Response(401, [], '{"message":"Unauthenticated."}'),
@@ -218,7 +219,7 @@ class SendPaymentsGatewayTest extends TestCase
 
     public function test_a_token_rejected_on_the_first_payment_throws(): void
     {
-        $this->registerGateway([new Response(200, [], self::FOUND), new Response(401, [], '{"message":"Unauthenticated."}')]);
+        $this->registerGateway([new Response(401, [], '{"message":"Unauthenticated."}')]);
 
         $this->expectException(MyDataAuthenticationException::class);
         (new SendPaymentsMethod())->handle(Invoices::posPayment());

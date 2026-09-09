@@ -6,10 +6,7 @@ use Firebed\AadeMyData\Models\Invoice;
 use Firebed\AadeMyData\Models\InvoiceDetails;
 use Firebed\AadeMyData\Models\InvoiceHeader;
 use Firebed\AadeMyData\Models\PaymentMethodDetail;
-use OxygenSuite\AadeMyData\Api\ProviderException;
-use OxygenSuite\AadeMyData\Api\UnauthorizedException;
 use OxygenSuite\AadeMyData\Exceptions\IssueTimeMissingException;
-use OxygenSuite\AadeMyData\Exceptions\MarkNotFoundException;
 
 /**
  * Turns a package Invoice into the JSON payload of the provider's POST /invoices.
@@ -22,7 +19,7 @@ final class InvoiceMapper
     private PaymentMethodMapper $payments;
     private SummaryMapper $summary;
 
-    public function __construct(private DocumentResolver $documents)
+    public function __construct()
     {
         $classifications = new ClassificationMapper();
 
@@ -34,7 +31,7 @@ final class InvoiceMapper
     }
 
     /**
-     * @throws MarkNotFoundException|IssueTimeMissingException|ProviderException|UnauthorizedException
+     * @throws IssueTimeMissingException
      * @return array<array-key, mixed>
      */
     public function map(Invoice $invoice): array
@@ -48,8 +45,8 @@ final class InvoiceMapper
             'issuer' => $this->parties->issuer($invoice->getIssuer()),
             'counterpart' => $this->parties->counterpart($invoice->getCounterpart()),
             'header' => $this->headers->header($header),
-            'correlated_documents' => $this->documents->resolve($header->getCorrelatedInvoices()),
-            'connected_documents' => $this->documents->resolve($header->getMultipleConnectedMarks()),
+            'correlated_documents' => $this->headers->marks($header->getCorrelatedInvoices()),
+            'connected_documents' => $this->headers->marks($header->getMultipleConnectedMarks()),
             'correlated_entities' => $this->headers->correlatedEntities($header->getOtherCorrelatedEntities()),
             'shipping_details' => $this->headers->shippingDetails($header->getOtherDeliveryNoteHeader()),
             'vehicles' => $this->headers->vehicles($invoice->getOtherTransportDetails()),
@@ -58,6 +55,8 @@ final class InvoiceMapper
             'taxes' => $this->summary->taxes($invoice->getTaxesTotals()),
             'summary' => $this->summary->summary($invoice->getInvoiceSummary()),
             'transmission_failure' => Values::scalar($invoice->get('transmissionFailure')),
+            // Not part of myDATA; the package keeps them on the model for the provider.
+            'extra_fields' => $invoice->getExtraFields(),
         ]);
     }
 }

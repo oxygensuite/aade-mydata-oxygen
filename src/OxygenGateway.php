@@ -23,9 +23,7 @@ use OxygenSuite\AadeMyData\Api\ProviderException;
 use OxygenSuite\AadeMyData\Api\ProviderResponse;
 use OxygenSuite\AadeMyData\Api\UnauthorizedException;
 use OxygenSuite\AadeMyData\Exceptions\IssueTimeMissingException;
-use OxygenSuite\AadeMyData\Exceptions\MarkNotFoundException;
 use OxygenSuite\AadeMyData\Mapping\CompanyResolver;
-use OxygenSuite\AadeMyData\Mapping\DocumentResolver;
 use OxygenSuite\AadeMyData\Mapping\InvoiceMapper;
 use OxygenSuite\AadeMyData\Mapping\PaymentMapper;
 use OxygenSuite\AadeMyData\Mapping\PaymentMethodMapper;
@@ -42,7 +40,6 @@ use OxygenSuite\AadeMyData\Signatures\SignatureService;
 final class OxygenGateway implements Gateway
 {
     private Gateway $inner;
-    private DocumentResolver $documents;
     private CompanyResolver $company;
     private InvoiceMapper $mapper;
     private PaymentMapper $payments;
@@ -53,9 +50,8 @@ final class OxygenGateway implements Gateway
     public function __construct(private ProviderClient $client, ?Gateway $inner = null)
     {
         $this->inner = $inner ?? new GuzzleGateway();
-        $this->documents = new DocumentResolver($client);
         $this->company = new CompanyResolver($client);
-        $this->mapper = new InvoiceMapper($this->documents);
+        $this->mapper = new InvoiceMapper();
         $this->payments = new PaymentMapper(new PaymentMethodMapper());
         $this->responses = new ProviderResponseMapper();
         $this->batch = new ResponseBatch($this->responses);
@@ -140,8 +136,6 @@ final class OxygenGateway implements Gateway
             return $duplicateUid === null
                 ? $this->responses->forStore($response)
                 : $this->recoverDuplicate($duplicateUid, $response);
-        } catch (MarkNotFoundException $e) {
-            return $this->responses->forMarkNotFound($e);
         } catch (IssueTimeMissingException $e) {
             return $this->responses->forMissingIssueTime($e);
         } catch (ProviderException $e) {
@@ -181,21 +175,18 @@ final class OxygenGateway implements Gateway
      */
     private function sendPayment(PaymentMethod $payment): Response
     {
-        $mark = $payment->getInvoiceMark();
+        $mark = (string) $payment->getInvoiceMark();
 
-        if ($mark === null) {
-            return $this->responses->forMissingMark('An invoice mark is required to send payment methods.');
+        if ($mark === '') {
+            return $this->responses->forMarkNotFound('An invoice mark is required to send payment methods.');
         }
 
         try {
-            $ulid = $this->documents->resolveOne((string) $mark);
             // myDATA leaves entityVatNumber empty when the ERP transmits its own documents,
             // and the provider needs it: ask it who the token belongs to.
             $vatNumber = $payment->getEntityVatNumber() ?: $this->company->vatNumber();
 
-            return $this->responses->forPayments($this->client->storePayments($ulid, $this->payments->map($payment, $vatNumber)));
-        } catch (MarkNotFoundException $e) {
-            return $this->responses->forMarkNotFound($e);
+            return $this->responses->forPayments($this->client->storePayments($mark, $this->payments->map($payment, $vatNumber)), $mark);
         } catch (ProviderException $e) {
             return $this->responses->forTransportFailure($e);
         }
@@ -215,13 +206,11 @@ final class OxygenGateway implements Gateway
     private function cancel(string $mark): Response
     {
         if ($mark === '') {
-            return $this->responses->forMissingMark('A mark is required to cancel an invoice.');
+            return $this->responses->forMarkNotFound('A mark is required to cancel an invoice.');
         }
 
         try {
-            return $this->responses->forCancel($this->client->cancelInvoice($this->documents->resolveOne($mark)));
-        } catch (MarkNotFoundException $e) {
-            return $this->responses->forMarkNotFound($e);
+            return $this->responses->forCancel($this->client->cancelInvoice($mark), $mark);
         } catch (ProviderException $e) {
             return $this->responses->forTransportFailure($e);
         }

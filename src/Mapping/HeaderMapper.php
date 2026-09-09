@@ -86,6 +86,20 @@ final class HeaderMapper
     }
 
     /**
+     * Correlated / connected documents, by myDATA mark, sent as the ERP stated them: the
+     * provider links its own marks, forwards the rest to myDATA and rejects what is not a
+     * mark, so nothing is looked up or dropped here. Non-scalars cannot name a document.
+     *
+     * @param array<array-key, mixed>|null $marks
+     *
+     * @return list<scalar>
+     */
+    public function marks(?array $marks): array
+    {
+        return array_values(array_filter($marks ?? [], is_scalar(...)));
+    }
+
+    /**
      * @param TransportDetail[]|null $details
      *
      * @return array<array-key, mixed>

@@ -35,7 +35,9 @@ final class CompanyResolver
             throw new ProviderException(sprintf('Reading the company profile from the provider failed with HTTP %d.', $response->status), $response->status);
         }
 
-        $vatNumber = $response->get('vat_number');
+        // The company resource is wrapped in `data`, unlike the invoice and signature resources.
+        $profile = $response->get('data');
+        $vatNumber = is_array($profile) ? ($profile['vat_number'] ?? null) : null;
 
         if (! is_string($vatNumber) || $vatNumber === '') {
             throw new ProviderException('The provider reported no VAT number for the company this token belongs to.', $response->status);

@@ -31,6 +31,10 @@ final class LineMapper
             // myDATA has no unit price: the ERP supplies it through InvoiceDetails::setUnitPrice(),
             // which the package keeps off the InvoicesDoc XML.
             'unit_price' => $line->getUnitPrice(),
+            // Likewise off the XML: the discount as the ERP states it (1 = percentage,
+            // 2 = amount), which the provider needs to re-check net_amount.
+            'discount_type' => Values::scalar($line->getDiscountType()),
+            'discount_amount' => $line->getDiscountValue(),
             'net_amount' => $line->getNetValue(),
             'vat_category' => Values::scalar($line->getVatCategory()),
             'vat_amount' => $line->getVatAmount(),
@@ -47,6 +51,7 @@ final class LineMapper
             'ship' => $this->ship($line->getDienergia()),
             'taxes' => $this->taxes($line),
             'classifications' => $this->classifications->collect($line->getIncomeClassification(), $line->getExpensesClassification()),
+            'extra_fields' => $line->getExtraFields(),
         ]);
     }
 

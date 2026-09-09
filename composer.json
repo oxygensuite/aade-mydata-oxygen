@@ -21,12 +21,15 @@
             "role": "Maintainer"
         }
     ],
+    "support": {
+        "email": "contracts@oxygen.gr"
+    },
     "require": {
         "php": "^8.2",
         "composer-runtime-api": "^2.0",
         "ext-dom": "*",
         "ext-json": "*",
-        "firebed/aade-mydata": "dev-feature/gateway",
+        "firebed/aade-mydata": "^5.11",
         "guzzlehttp/guzzle": "^7.0"
     },
     "require-dev": {
@@ -40,12 +43,6 @@
     "autoload-dev": {
         "psr-4": {"Tests\\": "tests/"}
     },
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/firebed/aade-mydata.git"
-        }
-    ],
     "scripts": {
         "test": "phpunit",
         "lint": "pint src tests",

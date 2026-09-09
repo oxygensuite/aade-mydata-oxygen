@@ -162,34 +162,37 @@ class OxygenGatewayTest extends TestCase
         $this->assertCount(1, $this->history);
     }
 
-    public function test_unknown_correlated_mark_is_a_validation_error_without_posting(): void
+    /**
+     * The provider resolves marks itself: the ones it holds are linked, the rest are
+     * transmitted for myDATA to judge. So a correlation costs no lookup and nothing is
+     * refused up front.
+     */
+    public function test_correlated_marks_are_posted_as_they_are_without_a_lookup(): void
     {
         $invoice = Invoices::b2b();
         $invoice->getInvoiceHeader()->setCorrelatedInvoices([400009]);
-        $this->registerGateway([new Response(200, [], '{"data":[]}')]);
+        $this->registerGateway([new Response(201, [], '{"uid":"U","mark":400010,"url":"u"}')]);
 
         $response = (new SendInvoices())->handle($invoice)->first();
 
-        $this->assertSame('ValidationError', $response->getStatusCode());
-        $this->assertSame('9001', $response->getErrors()->first()->getCode());
+        $this->assertTrue($response->isSuccessful());
         $this->assertCount(1, $this->history);
+        $this->assertSame([400009], $this->requestJson(0)['correlated_documents']);
     }
 
     public function test_total_cancellation_of_catering_documents_uses_the_cancel_endpoint(): void
     {
         $invoice = Invoices::b2b();
         $invoice->getInvoiceHeader()->setInvoiceType('8.6')->setTotalCancelDeliveryOrders(true)->setMultipleConnectedMarks([400001]);
-        $this->registerGateway([
-            new Response(200, [], '{"data":[{"id":"01C"}]}'),
-            new Response(201, [], '{"uid":"U","mark":400010,"url":"u"}'),
-        ]);
+        $this->registerGateway([new Response(201, [], '{"uid":"U","mark":400010,"url":"u"}')]);
 
         $response = (new SendInvoices())->handle($invoice)->first();
 
         $this->assertSame('400010', $response->getInvoiceMark());
-        $this->assertStringEndsWith('/invoices/cancel', $this->history[1]['request']->getUri()->getPath());
-        $this->assertSame(['01C'], $this->requestJson(1)['connected_documents']);
-        $this->assertTrue($this->requestJson(1)['header']['cancels_delivery_orders']);
+        $this->assertCount(1, $this->history);
+        $this->assertStringEndsWith('/invoices/cancel', $this->history[0]['request']->getUri()->getPath());
+        $this->assertSame([400001], $this->requestJson(0)['connected_documents']);
+        $this->assertTrue($this->requestJson(0)['header']['cancels_delivery_orders']);
     }
 
     public function test_other_requests_fall_through_to_the_inner_gateway(): void

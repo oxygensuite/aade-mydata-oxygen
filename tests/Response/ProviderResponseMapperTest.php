@@ -7,7 +7,6 @@ use Firebed\AadeMyData\Models\Response;
 use Firebed\AadeMyData\Models\ResponseDoc;
 use OxygenSuite\AadeMyData\Api\ProviderException;
 use OxygenSuite\AadeMyData\Api\ProviderResponse;
-use OxygenSuite\AadeMyData\Exceptions\MarkNotFoundException;
 use OxygenSuite\AadeMyData\Response\ProviderResponseMapper;
 use OxygenSuite\AadeMyData\Response\ResponseDocWriter;
 use Tests\TestCase;
@@ -74,7 +73,7 @@ class ProviderResponseMapperTest extends TestCase
     public function test_403_and_404_are_validation_errors_with_the_provider_message(): void
     {
         $forbidden = $this->mapper->forStore(new ProviderResponse(403, '{"message":"This company is not authorized to create B2B invoices."}'));
-        $missing = $this->mapper->forCancel(new ProviderResponse(404, '{"message":"Not found."}'));
+        $missing = $this->mapper->forStore(new ProviderResponse(404, '{"message":"Not found."}'));
 
         $this->assertSame('ValidationError', $forbidden->getStatusCode());
         $this->assertSame([['403', 'This company is not authorized to create B2B invoices.']], $this->errors($forbidden));
@@ -93,22 +92,33 @@ class ProviderResponseMapperTest extends TestCase
         $this->assertSame([['502', '<html>Bad Gateway</html>']], $this->errors($down));
     }
 
-    public function test_transport_failure_and_unknown_or_missing_mark(): void
+    public function test_transport_failure(): void
     {
         $transport = $this->mapper->forTransportFailure(new ProviderException('cURL error 28', ProviderException::TIMED_OUT));
-        $unknown = $this->mapper->forMarkNotFound(new MarkNotFoundException('400009'));
-        $missing = $this->mapper->forMissingMark('A mark is required to cancel an invoice.');
 
         $this->assertSame('TechnicalError', $transport->getStatusCode());
         $this->assertSame([['28', 'cURL error 28']], $this->errors($transport));
-        $this->assertSame('ValidationError', $unknown->getStatusCode());
-        $this->assertSame([['9001', 'Invoice with mark 400009 was not found in the provider.']], $this->errors($unknown));
+    }
+
+    /**
+     * 9001 whether no mark was given or the by-mark routes answered 404 for it.
+     */
+    public function test_a_missing_or_unknown_mark_is_9001(): void
+    {
+        $missing = $this->mapper->forMarkNotFound('A mark is required to cancel an invoice.');
+        $cancel = $this->mapper->forCancel(new ProviderResponse(404, '{"message":"No query results for model [Invoice] 400009"}'), '400009');
+        $payments = $this->mapper->forPayments(new ProviderResponse(404, '{"message":"Not found."}'), '400999');
+
+        $this->assertSame('ValidationError', $missing->getStatusCode());
         $this->assertSame([['9001', 'A mark is required to cancel an invoice.']], $this->errors($missing));
+        $this->assertSame('ValidationError', $cancel->getStatusCode());
+        $this->assertSame([['9001', 'Invoice with mark 400009 was not found in the provider.']], $this->errors($cancel));
+        $this->assertSame([['9001', 'Invoice with mark 400999 was not found in the provider.']], $this->errors($payments));
     }
 
     public function test_payments_201_is_success_with_both_marks(): void
     {
-        $response = $this->mapper->forPayments(new ProviderResponse(201, '{"invoice_mark":400001,"payment_method_mark":500001,"invoice_total":12.4,"total_paid_amount":12.4,"total_unpaid_amount":0}'));
+        $response = $this->mapper->forPayments(new ProviderResponse(201, '{"invoice_mark":400001,"payment_method_mark":500001,"invoice_total":12.4,"total_paid_amount":12.4,"total_unpaid_amount":0}'), '400001');
 
         $this->assertTrue($response->isSuccessful());
         $this->assertSame('400001', $response->getInvoiceMark());
@@ -121,7 +131,7 @@ class ProviderResponseMapperTest extends TestCase
      */
     public function test_payments_202_is_success_without_a_payment_mark(): void
     {
-        $response = $this->mapper->forPayments(new ProviderResponse(202, '{"invoice_mark":400001,"payment_method_mark":null,"invoice_total":12.4}'));
+        $response = $this->mapper->forPayments(new ProviderResponse(202, '{"invoice_mark":400001,"payment_method_mark":null,"invoice_total":12.4}'), '400001');
 
         $this->assertTrue($response->isSuccessful());
         $this->assertSame('400001', $response->getInvoiceMark());
@@ -130,7 +140,7 @@ class ProviderResponseMapperTest extends TestCase
 
     public function test_payments_relay_field_errors_and_mydata_codes(): void
     {
-        $response = $this->mapper->forPayments(new ProviderResponse(422, '{"message":"invalid","errors":{"payments.0.signature":["The signature is invalid."],"304":["Payment method already submitted"]}}'));
+        $response = $this->mapper->forPayments(new ProviderResponse(422, '{"message":"invalid","errors":{"payments.0.signature":["The signature is invalid."],"304":["Payment method already submitted"]}}'), '400001');
 
         $this->assertSame('ValidationError', $response->getStatusCode());
         $this->assertSame([
@@ -141,7 +151,7 @@ class ProviderResponseMapperTest extends TestCase
 
     public function test_payments_service_unavailable_is_a_technical_error(): void
     {
-        $response = $this->mapper->forPayments(new ProviderResponse(503, '{"message":"Service unavailable. Please try again later."}'));
+        $response = $this->mapper->forPayments(new ProviderResponse(503, '{"message":"Service unavailable. Please try again later."}'), '400001');
 
         $this->assertSame('TechnicalError', $response->getStatusCode());
         $this->assertSame('503', $response->getErrors()->first()->getCode());
@@ -150,14 +160,14 @@ class ProviderResponseMapperTest extends TestCase
 
     public function test_payments_2xx_without_json_is_a_technical_error(): void
     {
-        $response = $this->mapper->forPayments(new ProviderResponse(201, '<html>oops</html>'));
+        $response = $this->mapper->forPayments(new ProviderResponse(201, '<html>oops</html>'), '400001');
 
         $this->assertSame('TechnicalError', $response->getStatusCode());
         $this->assertSame('9002', $response->getErrors()->first()->getCode());
     }
     public function test_cancel_success(): void
     {
-        $cancel = $this->mapper->forCancel(new ProviderResponse(200, '{"cancellation_mark":400002,"cancelled_at":"2026-08-27T10:00:00+03:00"}'));
+        $cancel = $this->mapper->forCancel(new ProviderResponse(200, '{"cancellation_mark":400002,"cancelled_at":"2026-08-27T10:00:00+03:00"}'), '400001');
 
         $this->assertTrue($cancel->isSuccessful());
         $this->assertSame('400002', $cancel->getCancellationMark());

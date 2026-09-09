@@ -34,6 +34,7 @@ final class PaymentMethodMapper
             // names the field when it does not belong, which beats dropping a signature the
             // ERP meant to send and transmitting the payment unsigned.
             'signature' => $method->getProvidersSignature()?->getSignature(),
+            'extra_fields' => $method->getExtraFields(),
         ]);
     }
 }

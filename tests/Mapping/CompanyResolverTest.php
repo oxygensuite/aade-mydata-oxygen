@@ -12,7 +12,7 @@ class CompanyResolverTest extends TestCase
 {
     public function test_the_vat_number_is_read_from_the_company_profile_once(): void
     {
-        $resolver = new CompanyResolver($this->providerClient([new Response(200, [], '{"id":"01C","vat_number":"123456789","name":"Test"}')]));
+        $resolver = new CompanyResolver($this->providerClient([new Response(200, [], '{"data":{"id":"01C","vat_number":"123456789","name":"Test"}}')]));
 
         $this->assertSame('123456789', $resolver->vatNumber());
         $this->assertSame('123456789', $resolver->vatNumber());
@@ -36,7 +36,7 @@ class CompanyResolverTest extends TestCase
 
     public function test_a_profile_without_a_vat_number_is_a_failure_not_an_empty_payload(): void
     {
-        $resolver = new CompanyResolver($this->providerClient([new Response(200, [], '{"id":"01C","name":"Test"}')]));
+        $resolver = new CompanyResolver($this->providerClient([new Response(200, [], '{"data":{"id":"01C","name":"Test"}}')]));
 
         $this->expectException(ProviderException::class);
         $resolver->vatNumber();
