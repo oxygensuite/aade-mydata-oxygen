@@ -65,6 +65,26 @@ final class OxygenProvider
             : throw new LogicException('OxygenProvider::register() must run before POS signatures can be created.');
     }
 
+    /**
+     * The mydataprovider v2 client behind the registered gateway.
+     *
+     * The gateway routes the package's myDATA requests through it; this hands back that
+     * same connection for the provider calls those requests do not cover.
+     *
+     * Read off the registered gateway rather than kept here, so unregistering — or a
+     * per-request gateway — can never leave a stale connection behind.
+     *
+     * @throws LogicException when the provider has not been registered
+     */
+    public static function client(): ProviderClient
+    {
+        $gateway = MyDataRequest::gateway();
+
+        return $gateway instanceof OxygenGateway
+            ? $gateway->client()
+            : throw new LogicException('OxygenProvider::register() must run before the provider client can be used.');
+    }
+
     public static function isRegistered(): bool
     {
         return MyDataRequest::gateway() instanceof OxygenGateway;

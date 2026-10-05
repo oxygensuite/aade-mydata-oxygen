@@ -16,11 +16,19 @@ use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use LogicException;
+use OxygenSuite\AadeMyData\OxygenGateway;
 use Tests\Fixtures\Invoices;
 use Tests\Support\RecordingGateway;
 
 class OxygenGatewayTest extends TestCase
 {
+    public function test_the_gateway_exposes_the_provider_client_it_was_built_with(): void
+    {
+        $client = $this->providerClient([]);
+
+        $this->assertSame($client, (new OxygenGateway($client))->client());
+    }
+
     public function test_send_invoices_posts_each_invoice_and_returns_a_response_doc(): void
     {
         $this->registerGateway([
