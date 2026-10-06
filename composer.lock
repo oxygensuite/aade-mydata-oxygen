@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ab8d4daa1acd7372d7f9ef11f090b664",
+    "content-hash": "da55877100eecc63ded2666fea5d90f2",
     "packages": [
         {
             "name": "firebed/aade-mydata",
-            "version": "v5.11.0",
+            "version": "v5.13.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/firebed/aade-mydata.git",
-                "reference": "e449858170983f5992c9e30733ae78745380ab2b"
+                "reference": "ac43b5fa67bc710da28d4055193f906822bedf31"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/firebed/aade-mydata/zipball/e449858170983f5992c9e30733ae78745380ab2b",
-                "reference": "e449858170983f5992c9e30733ae78745380ab2b",
+                "url": "https://api.github.com/repos/firebed/aade-mydata/zipball/ac43b5fa67bc710da28d4055193f906822bedf31",
+                "reference": "ac43b5fa67bc710da28d4055193f906822bedf31",
                 "shasum": ""
             },
             "require": {
@@ -56,9 +56,9 @@
             ],
             "support": {
                 "issues": "https://github.com/firebed/aade-mydata/issues",
-                "source": "https://github.com/firebed/aade-mydata/tree/v5.11.0"
+                "source": "https://github.com/firebed/aade-mydata/tree/v5.13.0"
             },
-            "time": "2026-09-09T08:58:43+00:00"
+            "time": "2026-10-06T11:00:09+00:00"
         },
         {
             "name": "guzzlehttp/guzzle",
@@ -668,16 +668,16 @@
         },
         {
             "name": "symfony/polyfill-php80",
-            "version": "v1.37.0",
+            "version": "v1.43.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-php80.git",
-                "reference": "dfb55726c3a76ea3b6459fcfda1ec2d80a682411"
+                "reference": "9c6a5d6b01ca51d486c813e9a9c0ed55f208bb74"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-php80/zipball/dfb55726c3a76ea3b6459fcfda1ec2d80a682411",
-                "reference": "dfb55726c3a76ea3b6459fcfda1ec2d80a682411",
+                "url": "https://api.github.com/repos/symfony/polyfill-php80/zipball/9c6a5d6b01ca51d486c813e9a9c0ed55f208bb74",
+                "reference": "9c6a5d6b01ca51d486c813e9a9c0ed55f208bb74",
                 "shasum": ""
             },
             "require": {
@@ -728,7 +728,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-php80/tree/v1.37.0"
+                "source": "https://github.com/symfony/polyfill-php80/tree/v1.43.0"
             },
             "funding": [
                 {
@@ -748,7 +748,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-04-10T16:19:22+00:00"
+            "time": "2026-09-25T15:50:05+00:00"
         }
     ],
     "packages-dev": [

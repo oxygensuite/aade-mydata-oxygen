@@ -29,7 +29,7 @@
         "composer-runtime-api": "^2.0",
         "ext-dom": "*",
         "ext-json": "*",
-        "firebed/aade-mydata": "^5.11",
+        "firebed/aade-mydata": "^5.13",
         "guzzlehttp/guzzle": "^7.0"
     },
     "require-dev": {

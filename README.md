@@ -8,7 +8,7 @@ Every other request keeps talking to ΑΑΔΕ directly.
 ## Requirements
 
 - PHP ^8.2
-- `firebed/aade-mydata` ^5.11
+- `firebed/aade-mydata` ^5.13
 - A company API token from the Oxygen provider. For sandbox and production API keys,
   contact [contracts@oxygen.gr](mailto:contracts@oxygen.gr).
 
