@@ -6,6 +6,7 @@ use Firebed\AadeMyData\Http\GuzzleGateway;
 use Firebed\AadeMyData\Http\MyDataRequest;
 use InvalidArgumentException;
 use LogicException;
+use OxygenSuite\AadeMyData\Api\ProviderClient;
 use OxygenSuite\AadeMyData\Endpoints;
 use OxygenSuite\AadeMyData\OxygenGateway;
 use OxygenSuite\AadeMyData\OxygenProvider;
@@ -31,6 +32,32 @@ class OxygenProviderTest extends TestCase
         OxygenProvider::register('token');
 
         $this->assertInstanceOf(SignatureService::class, OxygenProvider::signatures());
+    }
+
+    public function test_the_provider_client_is_reachable_once_the_provider_is_registered(): void
+    {
+        OxygenProvider::register('token');
+
+        $this->assertInstanceOf(ProviderClient::class, OxygenProvider::client());
+    }
+
+    /**
+     * Read off the registered gateway, so unregistering cannot leave a client pointing at a
+     * connection the ERP has already switched away from.
+     */
+    public function test_the_provider_client_is_unreachable_without_a_registered_provider(): void
+    {
+        foreach (['never registered', 'after unregister'] as $case) {
+            try {
+                OxygenProvider::client();
+                $this->fail("expected a LogicException $case");
+            } catch (LogicException $e) {
+                $this->assertStringContainsString('register()', $e->getMessage());
+            }
+
+            OxygenProvider::register('token');
+            OxygenProvider::unregister();
+        }
     }
 
     /**

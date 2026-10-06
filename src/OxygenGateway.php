@@ -69,6 +69,15 @@ final class OxygenGateway implements Gateway
     }
 
     /**
+     * The mydataprovider v2 client this gateway transmits through. OxygenProvider::client()
+     * exposes it so it follows register()/unregister().
+     */
+    public function client(): ProviderClient
+    {
+        return $this->client;
+    }
+
+    /**
      * @param array<array-key, mixed> $query
      */
     public function get(MyDataRequest $request, array $query): string

@@ -8,7 +8,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 
 /**
- * Thin wrapper over the mydataprovider v2 endpoints the bridge needs.
+ * Thin wrapper over the mydataprovider v2 endpoints.
  * HTTP errors are returned as ProviderResponse; only 401 and transport failures throw.
  * An `{invoice}` path segment is the provider's id or the document's myDATA mark: the
  * provider binds either.
@@ -73,6 +73,31 @@ final class ProviderClient
     }
 
     /**
+     * Catering delivery orders that are currently pending or expired. The response is not
+     * paginated: it lists every match together with the aggregate totals of the set.
+     *
+     * @throws ProviderException|UnauthorizedException
+     *
+     * @param array<string, scalar> $filters status (`pending`/`expired`), table_number, locale
+     */
+    public function findCateringDocuments(array $filters = []): ProviderResponse
+    {
+        return $this->send('GET', 'catering-documents', ['query' => $filters]);
+    }
+
+    /**
+     * Aggregated net, VAT and gross totals for a set of pending catering documents.
+     *
+     * @throws ProviderException|UnauthorizedException
+     *
+     * @param list<string> $ids ulids of the catering documents to aggregate
+     */
+    public function cateringDocumentTotals(array $ids): ProviderResponse
+    {
+        return $this->send('GET', 'catering-documents/totals', ['query' => ['ids' => $ids]]);
+    }
+
+    /**
      * @throws ProviderException|UnauthorizedException
      *
      * @param array<string, scalar> $filters
@@ -91,11 +116,57 @@ final class ProviderClient
     }
 
     /**
+     * Updates the Peppol metadata (contract references and counterpart identification) of an
+     * invoice already transmitted to myDATA. The payload must carry `options.is_peppol: true`
+     * to route the request to the Peppol update handler.
+     *
+     * @throws ProviderException|UnauthorizedException
+     *
+     * @param array<array-key, mixed> $payload
+     */
+    public function patchInvoice(string $invoice, array $payload): ProviderResponse
+    {
+        return $this->send('PATCH', "invoices/$invoice", ['json' => $payload]);
+    }
+
+    /**
+     * The raw myDATA XML transmitted for the invoice, in the response's raw body.
+     *
+     * @throws ProviderException|UnauthorizedException
+     */
+    public function showInvoiceMyData(string $invoice): ProviderResponse
+    {
+        return $this->send('GET', "invoices/$invoice/mydata");
+    }
+
+    /**
+     * Runs the invoice validation pipeline without creating or transmitting the invoice.
+     *
+     * @throws ProviderException|UnauthorizedException
+     *
+     * @param array<array-key, mixed> $payload
+     */
+    public function validateInvoice(array $payload): ProviderResponse
+    {
+        return $this->send('POST', 'invoices/validate', ['json' => $payload]);
+    }
+
+    /**
      * @throws ProviderException|UnauthorizedException
      */
     public function cancelInvoice(string $invoice): ProviderResponse
     {
         return $this->send('PATCH', "invoices/$invoice/cancel");
+    }
+
+    /**
+     * Re-submits an already-transmitted invoice to the Peppol network.
+     *
+     * @throws ProviderException|UnauthorizedException
+     */
+    public function resendInvoice(string $invoice): ProviderResponse
+    {
+        return $this->send('POST', "invoices/$invoice/resend");
     }
 
     /**
@@ -108,6 +179,16 @@ final class ProviderClient
     public function storePayments(string $invoice, array $payload): ProviderResponse
     {
         return $this->send('POST', "invoices/$invoice/payments", ['json' => $payload]);
+    }
+
+    /**
+     * The payments already registered against an invoice, ordered newest to oldest.
+     *
+     * @throws ProviderException|UnauthorizedException
+     */
+    public function findPayments(string $invoice): ProviderResponse
+    {
+        return $this->send('GET', "invoices/$invoice/payments");
     }
 
     /**
@@ -157,6 +238,41 @@ final class ProviderClient
     {
         return $this->send('GET', 'company');
     }
+
+    /**
+     * The provider's application name and current API version.
+     *
+     * @throws ProviderException|UnauthorizedException
+     */
+    public function home(): ProviderResponse
+    {
+        return $this->send('GET', '');
+    }
+
+    /**
+     * Liveness probe; the provider answers with the current date and time.
+     *
+     * @throws ProviderException|UnauthorizedException
+     */
+    public function ping(): ProviderResponse
+    {
+        return $this->send('GET', 'ping');
+    }
+
+    /**
+     * Sends $payload to the echoing endpoint with $method (GET, POST, PUT, PATCH or DELETE)
+     * and returns the request as the provider received it: useful for checking auth and the
+     * exact encoded payload.
+     *
+     * @throws ProviderException|UnauthorizedException
+     *
+     * @param array<array-key, mixed> $payload
+     */
+    public function echo(string $method = 'GET', array $payload = []): ProviderResponse
+    {
+        return $this->send($method, 'echo', $payload === [] ? [] : ['json' => $payload]);
+    }
+
     /**
      * @throws ProviderException|UnauthorizedException
      *

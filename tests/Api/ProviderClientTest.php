@@ -61,6 +61,40 @@ class ProviderClientTest extends TestCase
         $this->assertSame('POST https://sandbox-api.mydataprovider.gr/v2/invoices/01ABC/payments', $this->describe(4));
         $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/company', $this->describe(5));
     }
+
+    public function test_invoice_lifecycle_endpoints(): void
+    {
+        $client = $this->providerClient(array_fill(0, 4, new Response(200, [], '{}')));
+
+        $client->validateInvoice(['issuer' => []]);
+        $client->patchInvoice('01ABC', ['options' => ['is_peppol' => true]]);
+        $client->showInvoiceMyData('01ABC');
+        $client->resendInvoice('01ABC');
+
+        $this->assertSame('POST https://sandbox-api.mydataprovider.gr/v2/invoices/validate', $this->describe(0));
+        $this->assertSame('PATCH https://sandbox-api.mydataprovider.gr/v2/invoices/01ABC', $this->describe(1));
+        $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/invoices/01ABC/mydata', $this->describe(2));
+        $this->assertSame('POST https://sandbox-api.mydataprovider.gr/v2/invoices/01ABC/resend', $this->describe(3));
+    }
+
+    public function test_catering_payment_and_helper_endpoints(): void
+    {
+        $client = $this->providerClient(array_fill(0, 6, new Response(200, [], '{}')));
+
+        $client->findCateringDocuments(['status' => 'pending', 'table_number' => '5']);
+        $client->cateringDocumentTotals(['01A', '01B']);
+        $client->findPayments('01ABC');
+        $client->home();
+        $client->ping();
+        $client->echo('POST', ['a' => 1]);
+
+        $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/catering-documents?status=pending&table_number=5', $this->describe(0));
+        $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/catering-documents/totals?ids%5B0%5D=01A&ids%5B1%5D=01B', $this->describe(1));
+        $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/invoices/01ABC/payments', $this->describe(2));
+        $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/', $this->describe(3));
+        $this->assertSame('GET https://sandbox-api.mydataprovider.gr/v2/ping', $this->describe(4));
+        $this->assertSame('POST https://sandbox-api.mydataprovider.gr/v2/echo', $this->describe(5));
+    }
     public function test_base_url_may_be_resolved_lazily(): void
     {
         $base = 'https://sandbox-api.mydataprovider.gr/v2';
